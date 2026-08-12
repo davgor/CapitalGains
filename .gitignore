@@ -78,9 +78,6 @@ web_modules/
 .next
 out
 
-# electron-builder output
-release/
-
 # Nuxt.js build / generate output
 .nuxt
 dist
