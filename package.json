@@ -104,5 +104,10 @@
   },
   "optionalDependencies": {
     "@electron/windows-sign": "^1.2.2"
+  },
+  "overrides": {
+    "@connectrpc/connect-node": {
+      "undici": "6.28.0"
+    }
   }
 }

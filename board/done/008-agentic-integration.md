@@ -8,7 +8,7 @@ Wire Cursor SDK for Kickoff, Research ranking, and Lessons only. Control factory
 
 Broken down into sub-tickets 008.1–008.8. This epic is done when all of them are.
 
-008.1 Cursor SDK client + settings key · 008.2 Kickoff Zod + word budget · 008.3 Control frozen prompt · 008.4 Explorer Kickoff + global lessons + diversity · 008.5 Tape-bounded Research agent · 008.6 Lessons agent + role-tagged pool · 008.7 Failure/retry/infra_skip hygiene · 008.8 Usage metering
+008.1 Cursor SDK client + settings key · 008.2 Kickoff Zod + word budget · 008.3 Control frozen prompt · 008.4 Explorer Kickoff + global lessons + diversity · 008.5 Tape-bounded Research agent · 008.6 Lessons agent + role-tagged pool · 008.7 Failure/retry/infra_skip hygiene · 008.8 Usage metering · 008.9 undici audit override
 
 ## Acceptance criteria
 
@@ -106,3 +106,13 @@ Record per-run / per-factory token usage and cost when SDK provides it (`getUsag
 - [x] Missing usage from mock/local still leaves null cost without crashing
 - [x] Helper aggregates daily SDK spend across factories
 - [x] Unit tests with fixture usage payloads
+
+### 008.9 — Remediate undici via @cursor/sdk override
+
+Security Audit CI failed on PR after adding `@cursor/sdk`: nested `@connectrpc/connect-node@1.7.0` pulled `undici@5.29.0` (moderate/high; no upstream fix on undici 5). Force patched `undici@6.28.0` under connect-node via npm `overrides`.
+
+#### Acceptance criteria
+
+- [x] `npm audit --audit-level=moderate` reports 0 vulnerabilities
+- [x] `@connectrpc/connect-node` resolves `undici@6.28.0` (override)
+- [x] Existing unit tests / lint / typecheck / build still pass
