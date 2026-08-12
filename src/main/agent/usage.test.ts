@@ -49,14 +49,17 @@ describe('usage row persistence', () => {
 
   it('missing usage from mock/local leaves null cost without crashing', () => {
     const { factory, session } = seedFactorySession()
-    const row = recordAgentUsage(store, {
+    recordAgentUsage(store, {
       factoryId: factory.id,
       sessionId: session.id,
       stage: 'research',
       usage: null
     })
-    expect(row.costUsd).toBeNull()
-    expect(row.totalTokens).toBeNull()
+    const listed = store.listUsageBySessionDate('2024-06-03')
+    expect(listed[0]?.costUsd).toBeNull()
+    expect(listed[0]?.totalTokens).toBeNull()
+    expect(listed[0]?.inputTokens).toBeNull()
+    expect(listed[0]?.outputTokens).toBeNull()
   })
 })
 

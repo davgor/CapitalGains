@@ -86,7 +86,14 @@ async function invokeResearch(
     factoryId: opts.factoryId,
     sessionId: opts.sessionId
   })
-  const rawText = extractJsonObject(result.text) ?? result.text
+  const rawText = extractJsonObject(result.text)
+  if (!rawText) {
+    return {
+      plan: null,
+      schemaError: 'Research response was not valid JSON',
+      usage: result.usage
+    }
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(rawText) as unknown

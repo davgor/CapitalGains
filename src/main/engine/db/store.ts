@@ -499,12 +499,17 @@ function selectUsageByDate(db: Database.Database, sessionDate: string): AgentUsa
     factoryId: String(raw['factoryId']),
     sessionId: String(raw['sessionId']),
     stage: raw['stage'] as AgentStage,
-    inputTokens: raw['inputTokens'] === null || raw['inputTokens'] === undefined ? null : Number(raw['inputTokens']),
-    outputTokens:
-      raw['outputTokens'] === null || raw['outputTokens'] === undefined ? null : Number(raw['outputTokens']),
-    totalTokens:
-      raw['totalTokens'] === null || raw['totalTokens'] === undefined ? null : Number(raw['totalTokens']),
-    costUsd: raw['costUsd'] === null || raw['costUsd'] === undefined ? null : Number(raw['costUsd']),
+    inputTokens: nullableNumber(raw['inputTokens']),
+    outputTokens: nullableNumber(raw['outputTokens']),
+    totalTokens: nullableNumber(raw['totalTokens']),
+    costUsd: nullableNumber(raw['costUsd']),
     createdAt: String(raw['createdAt'])
   }))
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return Number(value)
 }

@@ -15,6 +15,13 @@ export interface RunKickoffResult {
   compressRetried: boolean
 }
 
+type InvokeResult = {
+  rawText: string
+  artifact: KickoffArtifact | null
+  schemaError: string | undefined
+  usage: RunKickoffResult['usage']
+}
+
 export async function runKickoff(opts: {
   agent: AgentPort
   factoryId: string
@@ -63,18 +70,9 @@ function finalize(
 }
 
 async function invokeKickoff(
-  opts: {
-    agent: AgentPort
-    factoryId: string
-    sessionId: string
-  },
+  opts: { agent: AgentPort; factoryId: string; sessionId: string },
   user: string
-): Promise<{
-  rawText: string
-  artifact: KickoffArtifact | null
-  schemaError: string | undefined
-  usage: RunKickoffResult['usage']
-}> {
+): Promise<InvokeResult> {
   const result = await opts.agent.runPrompt({
     stage: 'kickoff',
     system: KICKOFF_SYSTEM_PROMPT,
@@ -82,33 +80,41 @@ async function invokeKickoff(
     factoryId: opts.factoryId,
     sessionId: opts.sessionId
   })
-  const rawText = extractJsonObject(result.text) ?? result.text
+  return parseKickoffResponse(result.text, result.usage)
+}
+
+function parseKickoffResponse(
+  text: string,
+  usage: RunKickoffResult['usage']
+): InvokeResult {
+  const rawText = extractJsonObject(text)
+  if (!rawText) {
+    return invalidKickoff(text, usage, 'Kickoff response was not valid JSON')
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(rawText) as unknown
   } catch {
-    return {
-      rawText,
-      artifact: null,
-      schemaError: 'Kickoff response was not valid JSON',
-      usage: result.usage
-    }
+    return invalidKickoff(rawText, usage, 'Kickoff response was not valid JSON')
   }
   const safe = safeParseKickoffArtifact(parsed)
   if (!safe.success) {
-    return {
-      rawText,
-      artifact: null,
-      schemaError: safe.error.message,
-      usage: result.usage
-    }
+    return invalidKickoff(rawText, usage, safe.error.message)
   }
   return {
     rawText,
     artifact: parseKickoffArtifact(safe.data),
     schemaError: undefined,
-    usage: result.usage
+    usage
   }
+}
+
+function invalidKickoff(
+  rawText: string,
+  usage: RunKickoffResult['usage'],
+  schemaError: string
+): InvokeResult {
+  return { rawText, artifact: null, schemaError, usage }
 }
 
 function extractJsonObject(text: string): string | null {

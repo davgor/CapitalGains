@@ -26,18 +26,7 @@ export async function runLessons(opts: {
 }): Promise<RunLessonsResult> {
   const packet = lessonsInputSchema.parse(opts.packet)
   if (packet.infraSkip) {
-    const output: LessonsOutput = {
-      failureMode: 'infra_skip',
-      winLossFactor: 'operational_skip',
-      suggestedSeed: 'n/a',
-      excludeFromPromote: true
-    }
-    return {
-      output,
-      artifactJson: JSON.stringify(output),
-      usage: null,
-      skippedAgent: true
-    }
+    return infraSkipLessons()
   }
   const result = await opts.agent.runPrompt({
     stage: 'lessons',
@@ -46,7 +35,37 @@ export async function runLessons(opts: {
     factoryId: opts.factoryId,
     sessionId: opts.sessionId
   })
-  const rawText = extractJsonObject(result.text) ?? result.text
+  const output = parseLessonsAgentText(result.text)
+  return {
+    output,
+    artifactJson: JSON.stringify(output),
+    usage: result.usage,
+    skippedAgent: false
+  }
+}
+
+function infraSkipLessons(): RunLessonsResult {
+  const output: LessonsOutput = {
+    failureMode: 'infra_skip',
+    winLossFactor: 'operational_skip',
+    suggestedSeed: 'n/a',
+    excludeFromPromote: true
+  }
+  return {
+    output,
+    artifactJson: JSON.stringify(output),
+    usage: null,
+    skippedAgent: true
+  }
+}
+
+function parseLessonsAgentText(text: string): LessonsOutput {
+  const rawText = extractJsonObject(text)
+  if (!rawText) {
+    throw new AgentError('SchemaInvalid', 'Lessons response was not valid JSON', {
+      infraSkip: false
+    })
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(rawText) as unknown
@@ -59,13 +78,7 @@ export async function runLessons(opts: {
   if (!safe.success) {
     throw new AgentError('SchemaInvalid', safe.error.message, { infraSkip: false })
   }
-  const output = parseLessonsOutput(safe.data)
-  return {
-    output,
-    artifactJson: JSON.stringify(output),
-    usage: result.usage,
-    skippedAgent: false
-  }
+  return parseLessonsOutput(safe.data)
 }
 
 function extractJsonObject(text: string): string | null {
