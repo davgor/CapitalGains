@@ -1,10 +1,33 @@
 # Baseline ignore for ts-prune (one pattern per line)
 # Generated from tsconfig.node.json + tsconfig.web.json
 # Refresh after export moves/deletes: npm run deadcode:refresh
-# Refreshed 2026-08-12 (5 entries)
+# Refreshed 2026-08-12 (28 entries)
 
 electron.vite.config.ts:37 - default
+src/main/engine/orchestrator/sessionRunner.ts:26 - OrchestratorDeps
 src/preload/index.ts:24 - AutoUpdateApi
 src/preload/index.ts:25 - AppInfoApi
 src/shared/autoUpdate/types.ts:1 - AutoUpdatePhase
 src/shared/autoUpdate/types.ts:17 - AUTO_UPDATE_EVENT_CHANNEL
+src/shared/engine/ports.ts:14 - PlaceOrderRequest
+src/shared/engine/ports.ts:21 - Position
+src/shared/engine/ports.ts:32 - BrokerPort
+src/shared/engine/ports.ts:39 - isQuoteStale
+src/shared/engine/ports.ts:4 - Clock
+src/shared/engine/ports.ts:9 - MarketDataPort
+src/shared/engine/types.ts:102 - FeatureRow
+src/shared/engine/types.ts:123 - FrictionConfig
+src/shared/engine/types.ts:129 - DEFAULT_RISK_LIMITS
+src/shared/engine/types.ts:136 - DEFAULT_FRICTION
+src/shared/engine/types.ts:15 - Factory
+src/shared/engine/types.ts:23 - Session
+src/shared/engine/types.ts:3 - FactoryRole
+src/shared/engine/types.ts:35 - StageRecord
+src/shared/engine/types.ts:43 - Fill
+src/shared/engine/types.ts:5 - StageName
+src/shared/engine/types.ts:56 - Snapshot
+src/shared/engine/types.ts:64 - Outcome
+src/shared/engine/types.ts:76 - EngineConfig
+src/shared/engine/types.ts:82 - RiskLimits
+src/shared/engine/types.ts:89 - Allocation
+src/shared/engine/types.ts:96 - ResearchPlan

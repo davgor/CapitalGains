@@ -24,12 +24,14 @@
     "deadcode:refresh": "node scripts/deadcode-refresh.mjs"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "electron-log": "^5.4.4",
     "electron-updater": "^6.8.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/minimatch": "^5.1.2",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
