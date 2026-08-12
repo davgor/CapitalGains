@@ -79,6 +79,27 @@ export interface EngineConfig {
   valueJson: string
 }
 
+export interface LessonRow {
+  id: string
+  sessionId: string
+  roleTag: string
+  bodyJson: string
+  createdAt: string
+  excludeFromPromote: boolean
+}
+
+export interface AgentUsageRow {
+  id: string
+  factoryId: string
+  sessionId: string
+  stage: 'kickoff' | 'research' | 'lessons'
+  inputTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
+  costUsd: number | null
+  createdAt: string
+}
+
 export interface RiskLimits {
   maxSingleNameWeight: number
   maxSectorWeight: number

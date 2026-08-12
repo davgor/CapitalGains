@@ -1,8 +1,17 @@
+import type { AgentPromptRequest, AgentPromptResult } from '../agent/types'
 import type { Quote } from './types'
 
 /** Injectable wall-clock for deterministic tests (America/New_York sessions). */
 export interface Clock {
   now(): Date
+}
+
+/**
+ * Thin one-shot agent seam for Kickoff / Research / Lessons.
+ * Production uses Cursor SDK when CURSOR_API_KEY is present; tests inject a mock.
+ */
+export interface AgentPort {
+  runPrompt(req: AgentPromptRequest): Promise<AgentPromptResult>
 }
 
 /** Market data seam — real provider adapter lands in epic 010. */
