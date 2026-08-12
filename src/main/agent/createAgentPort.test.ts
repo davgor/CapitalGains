@@ -4,7 +4,7 @@ import { CURSOR_MODEL_ID } from '../../shared/agent/modelConfig'
 import type { AgentPort } from '../../shared/engine/ports'
 import { createAgentPort, createMockAgentPort } from './createAgentPort'
 
-describe('createAgentPort', () => {
+describe('createAgentPort mock path', () => {
   it('runs a one-shot prompt through an injected mock without network', async () => {
     const mock = createMockAgentPort({
       text: '{"ok":true}',
@@ -15,8 +15,7 @@ describe('createAgentPort', () => {
         costUsd: 0.001
       }
     })
-    const port = createAgentPort({ mock })
-    const result = await port.runPrompt({
+    const result = await createAgentPort({ mock }).runPrompt({
       stage: 'kickoff',
       system: 'sys',
       user: 'user',
@@ -28,6 +27,26 @@ describe('createAgentPort', () => {
     expect(result.usage?.totalTokens).toBe(15)
   })
 
+  it('exposes AgentPort interface for unit tests without live SDK', async () => {
+    const calls: string[] = []
+    const mock: AgentPort = {
+      runPrompt: async (req) => {
+        calls.push(req.stage)
+        return { text: 'x', usage: null, modelId: CURSOR_MODEL_ID }
+      }
+    }
+    await createAgentPort({ mock }).runPrompt({
+      stage: 'lessons',
+      system: '',
+      user: '',
+      factoryId: 'f',
+      sessionId: 's'
+    })
+    expect(calls).toEqual(['lessons'])
+  })
+})
+
+describe('createAgentPort key missing', () => {
   it('fails Kickoff/Research/Lessons cleanly when API key is missing (no hang)', async () => {
     const port = createAgentPort({ apiKey: undefined, env: {} })
     await expect(
@@ -40,7 +59,9 @@ describe('createAgentPort', () => {
       })
     ).rejects.toMatchObject({ kind: 'MissingApiKey' } satisfies Partial<AgentError>)
   })
+})
 
+describe('createAgentPort fixed model', () => {
   it('uses a single fixed model id (not Auto/router) on the production path', async () => {
     const createAgent = vi.fn(async () => ({
       send: vi.fn(async () => ({
@@ -62,11 +83,10 @@ describe('createAgentPort', () => {
         runs: []
       }))
     }))
-    const port = createAgentPort({
+    const result = await createAgentPort({
       apiKey: 'test-key',
       createAgent: createAgent as never
-    })
-    const result = await port.runPrompt({
+    }).runPrompt({
       stage: 'research',
       system: 'sys',
       user: 'user',
@@ -81,23 +101,5 @@ describe('createAgentPort', () => {
     )
     expect(result.modelId).toBe(CURSOR_MODEL_ID)
     expect(result.text).toBe('hello')
-  })
-
-  it('exposes AgentPort interface for unit tests without live SDK', async () => {
-    const calls: string[] = []
-    const mock: AgentPort = {
-      runPrompt: async (req) => {
-        calls.push(req.stage)
-        return { text: 'x', usage: null, modelId: CURSOR_MODEL_ID }
-      }
-    }
-    await createAgentPort({ mock }).runPrompt({
-      stage: 'lessons',
-      system: '',
-      user: '',
-      factoryId: 'f',
-      sessionId: 's'
-    })
-    expect(calls).toEqual(['lessons'])
   })
 })

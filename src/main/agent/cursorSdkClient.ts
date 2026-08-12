@@ -38,28 +38,7 @@ export function createCursorSdkAgent(opts: {
   return {
     runPrompt: async (req) => {
       try {
-        const create = opts.createAgent ?? (await loadSdkCreate())
-        const agent = await create({
-          apiKey: opts.apiKey,
-          model: { id: opts.modelId },
-          cloud: { repos: [] }
-        })
-        const prompt = `${req.system}\n\n${req.user}`
-        const run = await agent.send(prompt)
-        const waited = await run.wait()
-        if (waited.status !== 'finished') {
-          throw new AgentError('SdkError', waited.error?.message ?? `agent run ${waited.status}`, {
-            infraSkip: true,
-            details: { code: waited.error?.code, stage: req.stage }
-          })
-        }
-        const usage = await resolveUsage(agent, waited.usage)
-        const result: AgentPromptResult = {
-          text: waited.result ?? '',
-          usage,
-          modelId: opts.modelId
-        }
-        return result
+        return await executePrompt(opts, req.system, req.user, req.stage)
       } catch (err) {
         if (err instanceof AgentError) {
           throw err
@@ -74,6 +53,33 @@ export function createCursorSdkAgent(opts: {
   }
 }
 
+async function executePrompt(
+  opts: { apiKey: string; modelId: CursorModelId; createAgent?: CreateCursorAgent },
+  system: string,
+  user: string,
+  stage: string
+): Promise<AgentPromptResult> {
+  const create = opts.createAgent ?? (await loadSdkCreate())
+  const agent = await create({
+    apiKey: opts.apiKey,
+    model: { id: opts.modelId },
+    cloud: { repos: [] }
+  })
+  const run = await agent.send(`${system}\n\n${user}`)
+  const waited = await run.wait()
+  if (waited.status !== 'finished') {
+    throw new AgentError('SdkError', waited.error?.message ?? `agent run ${waited.status}`, {
+      infraSkip: true,
+      details: { code: waited.error?.code, stage }
+    })
+  }
+  return {
+    text: waited.result ?? '',
+    usage: await resolveUsage(agent, waited.usage),
+    modelId: opts.modelId
+  }
+}
+
 async function loadSdkCreate(): Promise<CreateCursorAgent> {
   const mod = (await import('@cursor/sdk')) as { Agent: { create: CreateCursorAgent } }
   return mod.Agent.create.bind(mod.Agent) as CreateCursorAgent
@@ -83,22 +89,31 @@ async function resolveUsage(
   agent: SdkAgentHandle,
   runUsage: SdkRunUsage | undefined
 ): Promise<AgentUsageSnapshot | null> {
-  if (typeof agent.getUsage === 'function') {
-    try {
-      const billed = await agent.getUsage()
-      return {
-        inputTokens: billed.usage?.inputTokens ?? runUsage?.inputTokens ?? null,
-        outputTokens: billed.usage?.outputTokens ?? runUsage?.outputTokens ?? null,
-        totalTokens: billed.usage?.totalTokens ?? runUsage?.totalTokens ?? null,
-        costUsd:
-          billed.cost?.totalCents === undefined || billed.cost?.totalCents === null
-            ? null
-            : billed.cost.totalCents / 100
-      }
-    } catch {
-      // fall through to run usage
-    }
+  const billed = await tryGetBilledUsage(agent)
+  if (billed) {
+    return billed
   }
+  return snapshotFromRunUsage(runUsage)
+}
+
+async function tryGetBilledUsage(agent: SdkAgentHandle): Promise<AgentUsageSnapshot | null> {
+  if (typeof agent.getUsage !== 'function') {
+    return null
+  }
+  try {
+    const billed = await agent.getUsage()
+    return {
+      inputTokens: billed.usage?.inputTokens ?? null,
+      outputTokens: billed.usage?.outputTokens ?? null,
+      totalTokens: billed.usage?.totalTokens ?? null,
+      costUsd: centsToUsd(billed.cost?.totalCents)
+    }
+  } catch {
+    return null
+  }
+}
+
+function snapshotFromRunUsage(runUsage: SdkRunUsage | undefined): AgentUsageSnapshot | null {
   if (!runUsage) {
     return null
   }
@@ -108,4 +123,11 @@ async function resolveUsage(
     totalTokens: runUsage.totalTokens,
     costUsd: null
   }
+}
+
+function centsToUsd(totalCents: number | null | undefined): number | null {
+  if (totalCents === undefined || totalCents === null) {
+    return null
+  }
+  return totalCents / 100
 }

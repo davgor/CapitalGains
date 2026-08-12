@@ -29,6 +29,10 @@ export function safeParseKickoffArtifact(
   return { success: false, error: result.error }
 }
 
+function pick(o: Record<string, unknown>, camel: string, snake: string): unknown {
+  return o[camel] ?? o[snake]
+}
+
 function normalizeKickoffKeys(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return raw
@@ -36,11 +40,11 @@ function normalizeKickoffKeys(raw: unknown): unknown {
   const o = raw as Record<string, unknown>
   return {
     hypothesis: o.hypothesis ?? o.Hypothesis,
-    hypothesis_tested: o.hypothesis_tested ?? o.hypothesisTested,
+    hypothesis_tested: pick(o, 'hypothesis_tested', 'hypothesisTested'),
     style: o.style ?? o.Style,
-    searchDirective: o.searchDirective ?? o.search_directive,
-    negativeConstraints: o.negativeConstraints ?? o.negative_constraints,
-    allowFullCash: o.allowFullCash ?? o.allow_full_cash,
-    generatedKickoffPrompt: o.generatedKickoffPrompt ?? o.generated_kickoff_prompt
+    searchDirective: pick(o, 'searchDirective', 'search_directive'),
+    negativeConstraints: pick(o, 'negativeConstraints', 'negative_constraints'),
+    allowFullCash: pick(o, 'allowFullCash', 'allow_full_cash'),
+    generatedKickoffPrompt: pick(o, 'generatedKickoffPrompt', 'generated_kickoff_prompt')
   }
 }

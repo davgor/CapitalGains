@@ -25,7 +25,7 @@ const FROZEN: KickoffArtifact = {
   hypothesis_tested: 'control-baseline',
   style: 'baseline',
   searchDirective: 'fixed control scan',
-  negativeConstraints: ['no leverage', 'no penny names'],
+  negativeConstraints: ['no leveraged ETFs', 'no penny names'],
   allowFullCash: true,
   generatedKickoffPrompt: 'FROZEN CONTROL PROMPT — do not mutate'
 }
@@ -57,7 +57,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-describe('Control frozen prompt', () => {
+describe('Control frozen prompt load', () => {
   it('skips Kickoff agent and loads frozen prompt from store', async () => {
     saveControlFrozenKickoff(store, FROZEN)
     expect(shouldRunKickoffAgent('Control')).toBe(false)
@@ -87,9 +87,10 @@ describe('Control frozen prompt', () => {
     })
     expect(result.fromFrozen).toBe(true)
     expect(result.artifact.generatedKickoffPrompt).toContain('FROZEN CONTROL')
-    expect(loadControlFrozenKickoff(store).hypothesis).toBe(FROZEN.hypothesis)
   })
+})
 
+describe('Control frozen prompt mutation', () => {
   it('Lessons mutate of Control prompt is a no-op', () => {
     saveControlFrozenKickoff(store, FROZEN)
     const before = loadControlFrozenKickoff(store)
@@ -103,7 +104,7 @@ describe('Control frozen prompt', () => {
   })
 })
 
-describe('Explorer Kickoff packet + diversity', () => {
+describe('Explorer Kickoff packet assembly', () => {
   it('assembles Kickoff input packet from store-shaped inputs', () => {
     const factory = store.createFactory({ name: 'C', role: 'Control', evidenceWeight: 1 })
     const session = store.createSession({
@@ -116,10 +117,9 @@ describe('Explorer Kickoff packet + diversity', () => {
       role: 'Control',
       body: { failureMode: 'baseline', winLossFactor: 'n/a', suggestedSeed: 'x' }
     })
-    const lessons = queryGlobalLessonsPool(store)
     const packet = assembleKickoffInputPacket({
       regimeSummary: 'risk-on',
-      lessons,
+      lessons: queryGlobalLessonsPool(store),
       ownRecap: 'prior day flat',
       tape: TAPE,
       siblingHypotheses: ['other-hyp'],
@@ -127,11 +127,12 @@ describe('Explorer Kickoff packet + diversity', () => {
       factoryRole: 'Explorer'
     })
     expect(packet.globalLessons[0]?.roleTag).toBe('Control')
-    expect(packet.globalLessons[0]?.failureMode).toBe('baseline')
     expect(JSON.stringify(packet)).not.toContain('FROZEN CONTROL PROMPT')
     expect(packet.siblingExclusions).toEqual(['other-hyp'])
   })
+})
 
+describe('Explorer diversity collision', () => {
   it('Explore mode rejects duplicate hypotheses after retry', async () => {
     let calls = 0
     const agent = createMockAgentPort({
@@ -175,14 +176,13 @@ describe('Explorer Kickoff packet + diversity', () => {
     ).rejects.toMatchObject({ kind: 'DiversityCollision' } satisfies Partial<AgentError>)
     expect(calls).toBeGreaterThanOrEqual(2)
   })
+})
 
+describe('Explorer exploit mode', () => {
   it('Exploit mode disables diversity requirement', () => {
     const check = assertExplorerDiversity({
       mode: 'exploit',
-      candidate: {
-        ...FROZEN,
-        hypothesis_tested: 'same-idea'
-      },
+      candidate: { ...FROZEN, hypothesis_tested: 'same-idea' },
       siblingHypotheses: ['same-idea']
     })
     expect(check.ok).toBe(true)

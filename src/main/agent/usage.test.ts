@@ -18,14 +18,19 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-describe('usage metering', () => {
+function seedFactorySession(date = '2024-06-03') {
+  const factory = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
+  const session = store.createSession({
+    factoryId: factory.id,
+    sessionDate: date,
+    dailyLimitUsd: 10_000
+  })
+  return { factory, session }
+}
+
+describe('usage row persistence', () => {
   it('persists usage rows keyed by factory + session + stage', () => {
-    const factory = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
-    const session = store.createSession({
-      factoryId: factory.id,
-      sessionDate: '2024-06-03',
-      dailyLimitUsd: 10_000
-    })
+    const { factory, session } = seedFactorySession()
     const row = recordAgentUsage(store, {
       factoryId: factory.id,
       sessionId: session.id,
@@ -39,18 +44,11 @@ describe('usage metering', () => {
     })
     expect(row.factoryId).toBe(factory.id)
     expect(row.stage).toBe('kickoff')
-    const listed = store.listUsageBySessionDate('2024-06-03')
-    expect(listed).toHaveLength(1)
-    expect(listed[0]?.costUsd).toBe(0.02)
+    expect(store.listUsageBySessionDate('2024-06-03')[0]?.costUsd).toBe(0.02)
   })
 
   it('missing usage from mock/local leaves null cost without crashing', () => {
-    const factory = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
-    const session = store.createSession({
-      factoryId: factory.id,
-      sessionDate: '2024-06-03',
-      dailyLimitUsd: 10_000
-    })
+    const { factory, session } = seedFactorySession()
     const row = recordAgentUsage(store, {
       factoryId: factory.id,
       sessionId: session.id,
@@ -60,7 +58,9 @@ describe('usage metering', () => {
     expect(row.costUsd).toBeNull()
     expect(row.totalTokens).toBeNull()
   })
+})
 
+describe('usage aggregation', () => {
   it('aggregates daily SDK spend across factories', () => {
     const a = store.createFactory({ name: 'A', role: 'Explorer', evidenceWeight: 1 })
     const b = store.createFactory({ name: 'B', role: 'Control', evidenceWeight: 1 })

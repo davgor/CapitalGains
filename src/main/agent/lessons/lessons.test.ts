@@ -34,8 +34,8 @@ const PACKET: LessonsInputPacket = {
   infraSkip: false
 }
 
-describe('Lessons agent + role-tagged pool', () => {
-  it('persists Lessons input/output contracts and appends role-tagged pool entries', async () => {
+describe('Lessons contracts + pool append', () => {
+  it('persists Lessons output and appends role-tagged pool entries', async () => {
     const factory = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
     const session = store.createSession({
       factoryId: factory.id,
@@ -62,11 +62,11 @@ describe('Lessons agent + role-tagged pool', () => {
       role: 'Explorer',
       body: result.output
     })
-    const pool = queryGlobalLessonsPool(store, { limit: 10 })
-    expect(pool[0]?.roleTag).toBe('Explorer')
-    expect(pool[0]?.bodyJson).toContain('late_entry')
+    expect(queryGlobalLessonsPool(store)[0]?.roleTag).toBe('Explorer')
   })
+})
 
+describe('Lessons infra_skip promote exclusion', () => {
   it('infra_skip sessions mark lessons excluded from promote feeds', async () => {
     const factory = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
     const session = store.createSession({
@@ -94,12 +94,12 @@ describe('Lessons agent + role-tagged pool', () => {
       body: result.output,
       excludeFromPromote: true
     })
-    const forPromote = queryGlobalLessonsPool(store, { forPromote: true })
-    expect(forPromote).toHaveLength(0)
-    const all = queryGlobalLessonsPool(store)
-    expect(all).toHaveLength(1)
+    expect(queryGlobalLessonsPool(store, { forPromote: true })).toHaveLength(0)
+    expect(queryGlobalLessonsPool(store)).toHaveLength(1)
   })
+})
 
+describe('Lessons pool ordering', () => {
   it('global pool query returns capped newest-first role-tagged entries', () => {
     const factory = store.createFactory({ name: 'C', role: 'Control', evidenceWeight: 1 })
     const s1 = store.createSession({

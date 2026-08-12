@@ -1,16 +1,16 @@
 import { AgentError } from '../../../shared/agent/errors'
 import type { AgentPort } from '../../../shared/engine/ports'
+import type { FactoryRole } from '../../../shared/engine/types'
 import {
   assertExplorerDiversity,
+  hypothesisKey,
   serializeKickoffPacket,
   type DiversityMode,
   type KickoffInputPacket
 } from './assemblePacket'
 import { loadControlFrozenKickoff, shouldRunKickoffAgent } from './controlFrozen'
 import type { KickoffArtifact } from './schema'
-import { hypothesisKey } from './assemblePacket'
 import { runKickoff, type RunKickoffResult } from './runKickoff'
-import type { FactoryRole } from '../../../shared/engine/types'
 
 export async function runFactoryKickoff(opts: {
   agent: AgentPort
@@ -23,41 +23,62 @@ export async function runFactoryKickoff(opts: {
   diversityMode: DiversityMode
 }): Promise<RunKickoffResult & { fromFrozen: boolean }> {
   if (!shouldRunKickoffAgent(opts.role)) {
-    const artifact = loadControlFrozenKickoff(opts.frozenStore)
-    return {
-      artifact,
-      artifactJson: JSON.stringify(artifact),
-      usage: null,
-      compressRetried: false,
-      fromFrozen: true
-    }
+    return frozenKickoffResult(opts.frozenStore)
   }
-
-  const userPacket = serializeKickoffPacket(opts.packet)
   const first = await runKickoff({
     agent: opts.agent,
     factoryId: opts.factoryId,
     sessionId: opts.sessionId,
-    userPacket
+    userPacket: serializeKickoffPacket(opts.packet)
   })
-  const check = assertExplorerDiversity({
+  const firstCheck = assertExplorerDiversity({
     mode: opts.diversityMode,
     candidate: first.artifact,
     siblingHypotheses: opts.siblingHypotheses
   })
-  if (check.ok) {
+  if (firstCheck.ok) {
     return { ...first, fromFrozen: false }
   }
+  return retryKickoffForDiversity(opts, firstCheck.collision)
+}
 
+export function collectSiblingHypotheses(artifacts: KickoffArtifact[]): string[] {
+  return artifacts.map(hypothesisKey)
+}
+
+function frozenKickoffResult(
+  frozenStore: { getConfig<T>(key: string): T | undefined }
+): RunKickoffResult & { fromFrozen: boolean } {
+  const artifact = loadControlFrozenKickoff(frozenStore)
+  return {
+    artifact,
+    artifactJson: JSON.stringify(artifact),
+    usage: null,
+    compressRetried: false,
+    fromFrozen: true
+  }
+}
+
+async function retryKickoffForDiversity(
+  opts: {
+    agent: AgentPort
+    factoryId: string
+    sessionId: string
+    packet: KickoffInputPacket
+    siblingHypotheses: string[]
+    diversityMode: DiversityMode
+  },
+  collision: string
+): Promise<RunKickoffResult & { fromFrozen: boolean }> {
   const retryPacket = {
     ...opts.packet,
-    siblingExclusions: [...opts.packet.siblingExclusions, check.collision]
+    siblingExclusions: [...opts.packet.siblingExclusions, collision]
   }
   const second = await runKickoff({
     agent: opts.agent,
     factoryId: opts.factoryId,
     sessionId: opts.sessionId,
-    userPacket: `${serializeKickoffPacket(retryPacket)}\n\nDIVERSITY RETRY: hypothesis collided with "${check.collision}". Emit a distinct hypothesis_tested.`
+    userPacket: `${serializeKickoffPacket(retryPacket)}\n\nDIVERSITY RETRY: hypothesis collided with "${collision}". Emit a distinct hypothesis_tested.`
   })
   const secondCheck = assertExplorerDiversity({
     mode: opts.diversityMode,
@@ -72,8 +93,4 @@ export async function runFactoryKickoff(opts: {
     )
   }
   return { ...second, fromFrozen: false }
-}
-
-export function collectSiblingHypotheses(artifacts: KickoffArtifact[]): string[] {
-  return artifacts.map(hypothesisKey)
 }

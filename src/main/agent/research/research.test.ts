@@ -12,17 +12,14 @@ describe('Research Zod schema', () => {
       stopLossPercent: 2
     })
     expect(ok.success).toBe(true)
-    const sit = safeParseResearchPlan({ sitOut: true, allocations: [], stopLossPercent: 2 })
-    expect(sit.success).toBe(true)
-    const missingStop = safeParseResearchPlan({
-      sitOut: true,
-      allocations: []
-    })
-    expect(missingStop.success).toBe(false)
+    expect(safeParseResearchPlan({ sitOut: true, allocations: [], stopLossPercent: 2 }).success).toBe(
+      true
+    )
+    expect(safeParseResearchPlan({ sitOut: true, allocations: [] }).success).toBe(false)
   })
 })
 
-describe('runResearch tape bounds', () => {
+describe('runResearch off-tape rejection', () => {
   it('rejects off-tape symbols even if the agent emits them', async () => {
     const agent = createMockAgentPort({
       text: JSON.stringify({
@@ -42,7 +39,9 @@ describe('runResearch tape bounds', () => {
       })
     ).rejects.toMatchObject({ kind: 'OffTapeSymbol' } satisfies Partial<AgentError>)
   })
+})
 
+describe('runResearch schema retry and sitOut', () => {
   it('retries schema once then fails', async () => {
     let calls = 0
     const agent = createMockAgentPort({
