@@ -94,6 +94,22 @@ describe('dashboard service settings', () => {
     expect(settings.hasCursorApiKey).toBe(true)
     expect(JSON.stringify(settings)).not.toContain('sk-test')
   })
+
+  it('does not replace stored secrets with empty strings', () => {
+    const secrets = createSecureSecretsStore({
+      filePath: join(dir, 'keys.enc.json'),
+      crypto: cryptoPort
+    })
+    const dash = createDashboardService({ store, secrets })
+    dash.saveSettings({ cursorApiKey: 'cursor-secret', marketDataKey: 'market-secret' })
+
+    const settings = dash.saveSettings({ cursorApiKey: '', marketDataKey: '' })
+
+    expect(settings.hasCursorApiKey).toBe(true)
+    expect(settings.hasMarketDataKey).toBe(true)
+    expect(secrets.get('cursorApiKey')).toBe('cursor-secret')
+    expect(secrets.get('marketDataKey')).toBe('market-secret')
+  })
 })
 
 describe('dashboard service promote actions', () => {

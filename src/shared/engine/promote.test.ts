@@ -91,3 +91,41 @@ describe('evaluatePromoteKill killed factories', () => {
     expect(result.find((r) => r.factoryId === 'k')?.action).toBe('hold')
   })
 })
+
+describe('evaluatePromoteKill threshold boundaries', () => {
+  it('promotes when sessions and both excess values equal their minimums', () => {
+    const result = evaluatePromoteKill({
+      factories: [
+        stats({
+          factoryId: 'boundary',
+          sessionsExInfra: 3,
+          avgNetExcessVsSpy: 0.01,
+          avgNetExcessVsControl: 0.005,
+          maxDrawdown: 0.08
+        })
+      ],
+      thresholds
+    })
+
+    expect(result[0]).toEqual({
+      factoryId: 'boundary',
+      action: 'promote',
+      reason: 'thresholds met'
+    })
+  })
+
+  it('holds when either excess value is below its minimum', () => {
+    const result = evaluatePromoteKill({
+      factories: [
+        stats({ factoryId: 'spy-low', avgNetExcessVsSpy: 0.009 }),
+        stats({ factoryId: 'control-low', avgNetExcessVsControl: 0.004 })
+      ],
+      thresholds
+    })
+
+    expect(result).toEqual([
+      { factoryId: 'spy-low', action: 'hold', reason: 'excess below threshold' },
+      { factoryId: 'control-low', action: 'hold', reason: 'excess below threshold' }
+    ])
+  })
+})

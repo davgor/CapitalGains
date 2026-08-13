@@ -87,6 +87,22 @@ describe('allocateByEvidence exploration allotment', () => {
     expect(result.piles['n']).toBe(250)
     expect(result.piles['c']).toBe(1_750)
   })
+
+  it('treats a positive-weight Explorer as weighted, not unscored', () => {
+    const factories = [
+      factory({ id: 'e', name: 'Explorer', role: 'Explorer', evidenceWeight: 2 }),
+      factory({ id: 'p', name: 'Promoted', role: 'Promoted', evidenceWeight: 1 })
+    ]
+    const result = allocateByEvidence({
+      factories,
+      dailyLimitUsd: 900,
+      controlFloorWeight: 1,
+      explorationAllotmentUsd: 100
+    })
+
+    expect(result.effectiveWeights).toEqual({ e: 2, p: 1 })
+    expect(result.piles).toEqual({ e: 600, p: 300 })
+  })
 })
 
 describe('allocateByEvidence queue eligibility', () => {
@@ -109,5 +125,41 @@ describe('allocateByEvidence queue eligibility', () => {
     })
     expect(result.piles['q']).toBe(0)
     expect(result.piles['c']).toBe(1_000)
+  })
+})
+
+describe('allocateByEvidence zero-weight fallback', () => {
+  it('splits remaining cash equally across non-Explorer zero weights', () => {
+    const factories = [
+      factory({ id: 'a', name: 'A', role: 'Promoted', evidenceWeight: 0 }),
+      factory({ id: 'b', name: 'B', role: 'Promoted', evidenceWeight: -2 })
+    ]
+    const result = allocateByEvidence({
+      factories,
+      dailyLimitUsd: 90,
+      controlFloorWeight: 0,
+      explorationAllotmentUsd: 0
+    })
+
+    expect(result.effectiveWeights).toEqual({ a: 0, b: 0 })
+    expect(result.piles).toEqual({ a: 45, b: 45 })
+  })
+
+  it('assigns the final pile as the exact floating-point remainder', () => {
+    const factories = [
+      factory({ id: 'a', name: 'A', role: 'Promoted', evidenceWeight: 1 }),
+      factory({ id: 'b', name: 'B', role: 'Promoted', evidenceWeight: 1 }),
+      factory({ id: 'c', name: 'C', role: 'Promoted', evidenceWeight: 1 })
+    ]
+    const result = allocateByEvidence({
+      factories,
+      dailyLimitUsd: 0.1,
+      controlFloorWeight: 0,
+      explorationAllotmentUsd: 0
+    })
+
+    expect(result.piles['a']).toBe(0.03333333333333333)
+    expect(result.piles['b']).toBe(0.03333333333333333)
+    expect(result.piles['c']).toBe(0.03333333333333334)
   })
 })

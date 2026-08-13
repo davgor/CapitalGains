@@ -71,4 +71,34 @@ describe('appSettings config layer', () => {
       25_000
     )
   })
+
+  it('persists every remaining setting including numeric zero', () => {
+    const store = memoryStore()
+    const promoteThresholds = {
+      minSessionsExInfra: 8,
+      minNetExcessVsSpy: 0.03,
+      minNetExcessVsControl: 0.02,
+      maxDrawdown: 0.12
+    }
+
+    saveAppSettingsPatch(store, {
+      promoteThresholds,
+      controlFloorWeight: 0,
+      explorationAllotmentUsd: 0
+    })
+
+    expect(store.data).toMatchObject({
+      [CONFIG_KEYS.promoteThresholds]: promoteThresholds,
+      [CONFIG_KEYS.controlFloorWeight]: 0,
+      [CONFIG_KEYS.explorationAllotmentUsd]: 0
+    })
+    const loaded = loadAppSettings(store, {
+      hasCursorApiKey: false,
+      hasMarketDataKey: true
+    })
+    expect(loaded.promoteThresholds).toEqual(promoteThresholds)
+    expect(loaded.controlFloorWeight).toBe(0)
+    expect(loaded.explorationAllotmentUsd).toBe(0)
+    expect(loaded.hasMarketDataKey).toBe(true)
+  })
 })

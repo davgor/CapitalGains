@@ -18,6 +18,15 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
+function createSession() {
+  const factory = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
+  return store.createSession({
+    factoryId: factory.id,
+    sessionDate: '2024-06-03',
+    dailyLimitUsd: 1_000
+  })
+}
+
 describe('factory rename / queue / lineage', () => {
   it('renames a factory and persists', () => {
     const f = store.createFactory({ name: 'Old', role: 'Explorer', evidenceWeight: 1 })
@@ -57,5 +66,116 @@ describe('factory rename / queue / lineage', () => {
     store.insertPromoteEvent({ factoryId: f.id, action: 'promote', note: 'ok' })
     expect(store.listPromoteEvents()).toHaveLength(1)
     expect(store.listPromoteEvents()[0]?.action).toBe('promote')
+  })
+})
+
+describe('dashboard store idempotency', () => {
+  it('returns the original fill for a duplicate idempotency key', () => {
+    const session = createSession()
+    const first = store.insertFill({
+      sessionId: session.id,
+      symbol: 'AAPL',
+      side: 'buy',
+      shares: 2,
+      fillPrice: 100,
+      midPrice: 99,
+      commission: 0.02,
+      idempotencyKey: 'same-key',
+      filledAt: '2024-06-03T14:00:00.000Z'
+    })
+    const duplicate = store.insertFill({
+      sessionId: session.id,
+      symbol: 'MSFT',
+      side: 'buy',
+      shares: 9,
+      fillPrice: 50,
+      midPrice: 49,
+      commission: 0.09,
+      idempotencyKey: 'same-key',
+      filledAt: '2024-06-03T14:01:00.000Z'
+    })
+
+    expect(duplicate).toEqual(first)
+    expect(store.listFills(session.id)).toEqual([first])
+  })
+
+  it('updates an existing same-time snapshot without adding a row', () => {
+    const session = createSession()
+    const first = store.insertSnapshot({
+      sessionId: session.id,
+      asOf: '2024-06-03T15:00:00.000Z',
+      marksJson: '{"AAPL":100}',
+      unrealizedNet: 1
+    })
+    const updated = store.insertSnapshot({
+      sessionId: session.id,
+      asOf: '2024-06-03T15:00:00.000Z',
+      marksJson: '{"AAPL":105}',
+      unrealizedNet: 6
+    })
+
+    expect(updated.id).toBe(first.id)
+    expect(store.listSnapshots(session.id)).toEqual([updated])
+  })
+})
+
+describe('dashboard store aggregate reads', () => {
+  it('returns no outcomes for an empty session id list', () => {
+    expect(store.listOutcomesBySessionIds([])).toEqual([])
+  })
+
+  it('returns only outcomes belonging to requested session ids', () => {
+    const included = createSession()
+    const excluded = createSession()
+    const outcome = store.insertOutcome({
+      sessionId: included.id,
+      grossPnl: 12,
+      netPnl: 10,
+      fullLimitReturn: 0.01,
+      deployedReturn: 0.02,
+      spyReturn: 0.005,
+      cashResidual: 100
+    })
+    store.insertOutcome({
+      sessionId: excluded.id,
+      grossPnl: 99,
+      netPnl: 90,
+      fullLimitReturn: 0.09,
+      deployedReturn: 0.1,
+      spyReturn: 0.005,
+      cashResidual: 0
+    })
+
+    expect(store.listOutcomesBySessionIds([included.id])).toEqual([outcome])
+  })
+
+  it('preserves null and numeric agent usage values distinctly', () => {
+    const session = createSession()
+    store.insertUsage({
+      factoryId: session.factoryId,
+      sessionId: session.id,
+      stage: 'research',
+      usage: null
+    })
+    store.insertUsage({
+      factoryId: session.factoryId,
+      sessionId: session.id,
+      stage: 'lessons',
+      usage: { inputTokens: 10, outputTokens: 4, totalTokens: 14, costUsd: 0.02 }
+    })
+
+    const usage = store.listUsageBySessionDate(session.sessionDate)
+    expect(usage[0]).toMatchObject({
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+      costUsd: null
+    })
+    expect(usage[1]).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 4,
+      totalTokens: 14,
+      costUsd: 0.02
+    })
   })
 })

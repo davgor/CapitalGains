@@ -43,9 +43,12 @@ describe('analytics net excess', () => {
       })
     ])
     const explorer = rows.find((r) => r.factoryId === 'e')!
+    const control = rows.find((r) => r.factoryId === 'c')!
     expect(explorer.netExcessVsSpy).toBe(70)
     expect(explorer.netExcessVsControl).toBe(50)
     expect(explorer.winRateExInfra).toBeCloseTo(0.8, 6)
+    expect(explorer.isControlBaseline).toBe(false)
+    expect(control.isControlBaseline).toBe(true)
   })
 })
 
