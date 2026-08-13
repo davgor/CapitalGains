@@ -8,7 +8,7 @@ Deploy fails on every successful `main` CI: packaging succeeds, then the `releas
 
 ## Acceptance criteria
 
-- [ ] Unit test fails if `.github/workflows/deploy.yml` `release` job omits checkout at the release SHA or omits `--repo` on `gh release create`
-- [ ] `release` job checks out `${{ needs.prepare.outputs.sha }}` (with sufficient history for `--generate-notes`) before downloading artifacts
-- [ ] `gh release create` passes `--repo "${{ github.repository }}"`
-- [ ] `npm test`, `npm run lint`, `npm run typecheck`, `npm run deadcode`, `npm run build` pass
+- [x] Unit test fails if `.github/workflows/deploy.yml` `release` job omits checkout at the release SHA or omits `--repo` on `gh release create`
+- [x] `release` job checks out `${{ needs.prepare.outputs.sha }}` (with sufficient history for `--generate-notes`) before downloading artifacts
+- [x] `gh release create` passes `--repo "${{ github.repository }}"`
+- [x] `npm test`, `npm run lint`, `npm run typecheck`, `npm run deadcode`, `npm run build` pass
