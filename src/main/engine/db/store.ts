@@ -1,28 +1,33 @@
 import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type {
+  AgentUsageRow,
   EngineConfig,
   Factory,
   FactoryRole,
   Fill,
+  LessonRow,
   Outcome,
   Session,
   Snapshot,
   StageName,
   StageRecord
 } from '../../../shared/engine/types'
+import type { AgentStage, AgentUsageSnapshot } from '../../../shared/agent/types'
 import { migrate } from './schema'
 
 export interface EngineStore {
   close(): void
   createFactory(input: { name: string; role: FactoryRole; evidenceWeight: number }): Factory
   getFactory(id: string): Factory | undefined
+  listFactories(): Factory[]
   createSession(input: {
     factoryId: string
     sessionDate: string
     dailyLimitUsd: number
   }): Session
   getSession(id: string): Session | undefined
+  listSessionsByDate(sessionDate: string): Session[]
   updateSession(id: string, patch: Partial<Pick<Session, 'stage' | 'infraSkip' | 'buysBlocked'>>): Session
   commitStage(input: {
     sessionId: string
@@ -39,6 +44,20 @@ export interface EngineStore {
   getOutcome(sessionId: string): Outcome | undefined
   setConfig(key: string, value: unknown): EngineConfig
   getConfig<T>(key: string): T | undefined
+  insertLesson(input: {
+    sessionId: string
+    roleTag: string
+    bodyJson: string
+    excludeFromPromote?: boolean
+  }): LessonRow
+  listLessonsPool(opts?: { limit?: number; includeExcluded?: boolean }): LessonRow[]
+  insertUsage(input: {
+    factoryId: string
+    sessionId: string
+    stage: AgentStage
+    usage: AgentUsageSnapshot | null
+  }): AgentUsageRow
+  listUsageBySessionDate(sessionDate: string): AgentUsageRow[]
 }
 
 export function openEngineStore(dbPath: string): EngineStore {
@@ -54,8 +73,10 @@ function createRepository(db: Database.Database): EngineStore {
     close: () => db.close(),
     createFactory: (input) => insertFactory(db, input),
     getFactory: (id) => selectFactory(db, id),
+    listFactories: () => selectFactories(db),
     createSession: (input) => insertSession(db, input),
     getSession: (id) => selectSession(db, id),
+    listSessionsByDate: (sessionDate) => selectSessionsByDate(db, sessionDate),
     updateSession: (id, patch) => patchSession(db, id, patch),
     commitStage: (input) => insertStage(db, input),
     listStageRecords: (sessionId) => selectStages(db, sessionId),
@@ -67,7 +88,11 @@ function createRepository(db: Database.Database): EngineStore {
     insertOutcome: (input) => insertOut(db, input),
     getOutcome: (sessionId) => selectOut(db, sessionId),
     setConfig: (key, value) => upsertConfig(db, key, value),
-    getConfig: (key) => readConfig(db, key)
+    getConfig: (key) => readConfig(db, key),
+    insertLesson: (input) => insertLessonRow(db, input),
+    listLessonsPool: (opts) => selectLessonsPool(db, opts),
+    insertUsage: (input) => insertUsageRow(db, input),
+    listUsageBySessionDate: (sessionDate) => selectUsageByDate(db, sessionDate)
   }
 }
 
@@ -101,6 +126,15 @@ function selectFactory(db: Database.Database, id: string): Factory | undefined {
     )
     .get(id) as Factory | undefined
   return raw
+}
+
+function selectFactories(db: Database.Database): Factory[] {
+  return db
+    .prepare(
+      `SELECT id, name, role, evidence_weight AS evidenceWeight, created_at AS createdAt
+       FROM factories ORDER BY created_at ASC`
+    )
+    .all() as Factory[]
 }
 
 function insertSession(
@@ -160,6 +194,19 @@ function selectSession(db: Database.Database, id: string): Session | undefined {
     )
     .get(id) as Record<string, unknown> | undefined
   return raw ? mapSession(raw) : undefined
+}
+
+function selectSessionsByDate(db: Database.Database, sessionDate: string): Session[] {
+  const rows = db
+    .prepare(
+      `SELECT id, factory_id AS factoryId, session_date AS sessionDate, stage,
+              infra_skip AS infraSkip, buys_blocked AS buysBlocked,
+              daily_limit_usd AS dailyLimitUsd, created_at AS createdAt,
+              updated_at AS updatedAt
+       FROM sessions WHERE session_date = ? ORDER BY created_at ASC`
+    )
+    .all(sessionDate) as Record<string, unknown>[]
+  return rows.map(mapSession)
 }
 
 function patchSession(
@@ -341,4 +388,128 @@ function readConfig<T>(db: Database.Database, key: string): T | undefined {
     | { valueJson: string }
     | undefined
   return raw ? (JSON.parse(raw.valueJson) as T) : undefined
+}
+
+function insertLessonRow(
+  db: Database.Database,
+  input: {
+    sessionId: string
+    roleTag: string
+    bodyJson: string
+    excludeFromPromote?: boolean
+  }
+): LessonRow {
+  const row: LessonRow = {
+    id: randomUUID(),
+    sessionId: input.sessionId,
+    roleTag: input.roleTag,
+    bodyJson: input.bodyJson,
+    createdAt: nowIso(),
+    excludeFromPromote: input.excludeFromPromote ?? false
+  }
+  db.prepare(
+    `INSERT INTO lessons (id, session_id, role_tag, body_json, created_at, exclude_from_promote)
+     VALUES (@id, @sessionId, @roleTag, @bodyJson, @createdAt, @excludeFromPromote)`
+  ).run({
+    ...row,
+    excludeFromPromote: row.excludeFromPromote ? 1 : 0
+  })
+  return row
+}
+
+function selectLessonsPool(
+  db: Database.Database,
+  opts?: { limit?: number; includeExcluded?: boolean }
+): LessonRow[] {
+  const limit = opts?.limit ?? 50
+  const includeExcluded = opts?.includeExcluded ?? true
+  const rows = includeExcluded
+    ? (db
+        .prepare(
+          `SELECT id, session_id AS sessionId, role_tag AS roleTag, body_json AS bodyJson,
+                  created_at AS createdAt, exclude_from_promote AS excludeFromPromote
+           FROM lessons ORDER BY created_at DESC, rowid DESC LIMIT ?`
+        )
+        .all(limit) as Array<Record<string, unknown>>)
+    : (db
+        .prepare(
+          `SELECT id, session_id AS sessionId, role_tag AS roleTag, body_json AS bodyJson,
+                  created_at AS createdAt, exclude_from_promote AS excludeFromPromote
+           FROM lessons WHERE exclude_from_promote = 0
+           ORDER BY created_at DESC, rowid DESC LIMIT ?`
+        )
+        .all(limit) as Array<Record<string, unknown>>)
+  return rows.map((raw) => ({
+    id: String(raw['id']),
+    sessionId: String(raw['sessionId']),
+    roleTag: String(raw['roleTag'] ?? ''),
+    bodyJson: String(raw['bodyJson']),
+    createdAt: String(raw['createdAt']),
+    excludeFromPromote: Boolean(raw['excludeFromPromote'])
+  }))
+}
+
+function insertUsageRow(
+  db: Database.Database,
+  input: {
+    factoryId: string
+    sessionId: string
+    stage: AgentStage
+    usage: AgentUsageSnapshot | null
+  }
+): AgentUsageRow {
+  const row: AgentUsageRow = {
+    id: randomUUID(),
+    factoryId: input.factoryId,
+    sessionId: input.sessionId,
+    stage: input.stage,
+    inputTokens: input.usage?.inputTokens ?? null,
+    outputTokens: input.usage?.outputTokens ?? null,
+    totalTokens: input.usage?.totalTokens ?? null,
+    costUsd: input.usage?.costUsd ?? null,
+    createdAt: nowIso()
+  }
+  db.prepare(
+    `INSERT INTO agent_usage (
+      id, factory_id, session_id, stage, input_tokens, output_tokens,
+      total_tokens, cost_usd, created_at
+    ) VALUES (
+      @id, @factoryId, @sessionId, @stage, @inputTokens, @outputTokens,
+      @totalTokens, @costUsd, @createdAt
+    )`
+  ).run(row)
+  return row
+}
+
+function selectUsageByDate(db: Database.Database, sessionDate: string): AgentUsageRow[] {
+  const rows = db
+    .prepare(
+      `SELECT u.id, u.factory_id AS factoryId, u.session_id AS sessionId, u.stage,
+              u.input_tokens AS inputTokens, u.output_tokens AS outputTokens,
+              u.total_tokens AS totalTokens, u.cost_usd AS costUsd,
+              u.created_at AS createdAt
+       FROM agent_usage u
+       INNER JOIN sessions s ON s.id = u.session_id
+       WHERE s.session_date = ?
+       ORDER BY u.created_at ASC`
+    )
+    .all(sessionDate) as Array<Record<string, unknown>>
+  return rows.map((raw) => ({
+    id: String(raw['id']),
+    factoryId: String(raw['factoryId']),
+    sessionId: String(raw['sessionId']),
+    stage: raw['stage'] as AgentStage,
+    inputTokens: nullableNumber(raw['inputTokens']),
+    outputTokens: nullableNumber(raw['outputTokens']),
+    totalTokens: nullableNumber(raw['totalTokens']),
+    costUsd: nullableNumber(raw['costUsd']),
+    createdAt: String(raw['createdAt'])
+  }))
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return Number(value)
 }

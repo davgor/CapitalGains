@@ -68,14 +68,38 @@ const STATEMENTS = [
     session_id TEXT NOT NULL REFERENCES sessions(id),
     role_tag TEXT,
     body_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    exclude_from_promote INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS agent_usage (
+    id TEXT PRIMARY KEY,
+    factory_id TEXT NOT NULL REFERENCES factories(id),
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    stage TEXT NOT NULL,
+    input_tokens REAL,
+    output_tokens REAL,
+    total_tokens REAL,
+    cost_usd REAL,
     created_at TEXT NOT NULL
   )`
+]
+
+/** Additive migrations for databases created before newer columns/tables. */
+const ALTERS = [
+  `ALTER TABLE lessons ADD COLUMN exclude_from_promote INTEGER NOT NULL DEFAULT 0`
 ]
 
 export function migrate(db: Database.Database): void {
   const run = db.transaction(() => {
     for (const sql of STATEMENTS) {
       db.exec(sql)
+    }
+    for (const sql of ALTERS) {
+      try {
+        db.exec(sql)
+      } catch {
+        // column already exists on fresh schemas
+      }
     }
   })
   run()
