@@ -17,7 +17,7 @@ function row(partial: Partial<LeaderboardRowInput> & Pick<LeaderboardRowInput, '
   }
 }
 
-describe('analytics leaderboard', () => {
+describe('analytics net excess', () => {
   it('computes net excess vs SPY and Control', () => {
     const rows = buildLeaderboard([
       row({
@@ -47,7 +47,9 @@ describe('analytics leaderboard', () => {
     expect(explorer.netExcessVsControl).toBe(50)
     expect(explorer.winRateExInfra).toBeCloseTo(0.8, 6)
   })
+})
 
+describe('analytics control row', () => {
   it('always includes Control row for comparison', () => {
     const rows = buildLeaderboard([
       row({
@@ -61,7 +63,9 @@ describe('analytics leaderboard', () => {
     ])
     expect(rows.some((r) => r.role === 'Control')).toBe(true)
   })
+})
 
+describe('analytics sorting', () => {
   it('sorts by net excess vs SPY descending', () => {
     const unsorted = buildLeaderboard([
       row({

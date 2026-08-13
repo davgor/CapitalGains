@@ -16,6 +16,14 @@ const cryptoPort: CryptoPort = {
   decryptString: (blob) => blob.toString('utf8').slice(4)
 }
 
+function createDash(now?: () => Date) {
+  const secrets = createSecureSecretsStore({
+    filePath: join(dir, 'keys.enc.json'),
+    crypto: cryptoPort
+  })
+  return createDashboardService({ store, secrets, now })
+}
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'cg-dash-'))
   store = openEngineStore(join(dir, 'engine.sqlite'))
@@ -26,17 +34,9 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-describe('dashboard service', () => {
+describe('dashboard service snapshot', () => {
   it('aggregates net daily profit and persists daily limit', () => {
-    const secrets = createSecureSecretsStore({
-      filePath: join(dir, 'keys.enc.json'),
-      crypto: cryptoPort
-    })
-    const dash = createDashboardService({
-      store,
-      secrets,
-      now: () => new Date('2024-06-03T14:00:00.000Z')
-    })
+    const dash = createDash(() => new Date('2024-06-03T14:00:00.000Z'))
     const control = store.createFactory({ name: 'Control', role: 'Control', evidenceWeight: 1 })
     const explorer = store.createFactory({ name: 'E1', role: 'Explorer', evidenceWeight: 1 })
     const cSession = store.createSession({
@@ -75,40 +75,30 @@ describe('dashboard service', () => {
     dash.setDailyLimit(12_000)
     expect(dash.getSnapshot().dailyLimitUsd).toBe(12_000)
   })
+})
 
+describe('dashboard service factory actions', () => {
   it('queues late factory adds and protects control identity', () => {
-    const secrets = createSecureSecretsStore({
-      filePath: join(dir, 'keys.enc.json'),
-      crypto: cryptoPort
-    })
-    const dash = createDashboardService({
-      store,
-      secrets,
-      now: () => new Date('2024-06-03T18:00:00.000Z')
-    })
+    const dash = createDash(() => new Date('2024-06-03T18:00:00.000Z'))
     store.createFactory({ name: 'Control', role: 'Control', evidenceWeight: 1 })
     const late = dash.addFactory('LateBird')
     expect(late.queuedNextOpen).toBe(true)
     expect(late.role).toBe('Explorer')
   })
+})
 
+describe('dashboard service settings', () => {
   it('saves secrets without exposing them in settings payload', () => {
-    const secrets = createSecureSecretsStore({
-      filePath: join(dir, 'keys.enc.json'),
-      crypto: cryptoPort
-    })
-    const dash = createDashboardService({ store, secrets })
+    const dash = createDash()
     const settings = dash.saveSettings({ cursorApiKey: 'sk-test' })
     expect(settings.hasCursorApiKey).toBe(true)
     expect(JSON.stringify(settings)).not.toContain('sk-test')
   })
+})
 
+describe('dashboard service promote actions', () => {
   it('promote / kill / clone update store and history', () => {
-    const secrets = createSecureSecretsStore({
-      filePath: join(dir, 'keys.enc.json'),
-      crypto: cryptoPort
-    })
-    const dash = createDashboardService({ store, secrets })
+    const dash = createDash()
     const explorer = store.createFactory({ name: 'E', role: 'Explorer', evidenceWeight: 1 })
     dash.confirmPromoteAction(explorer.id, 'promote')
     expect(store.getFactory(explorer.id)?.role).toBe('Promoted')
@@ -118,17 +108,11 @@ describe('dashboard service', () => {
     expect(store.getFactory(explorer.id)?.role).toBe('Killed')
     expect(store.listPromoteEvents().length).toBeGreaterThanOrEqual(3)
   })
+})
 
+describe('dashboard service leaderboard', () => {
   it('builds leaderboard sorted by net excess vs SPY with Control visible', () => {
-    const secrets = createSecureSecretsStore({
-      filePath: join(dir, 'keys.enc.json'),
-      crypto: cryptoPort
-    })
-    const dash = createDashboardService({
-      store,
-      secrets,
-      now: () => new Date('2024-06-03T14:00:00.000Z')
-    })
+    const dash = createDash(() => new Date('2024-06-03T14:00:00.000Z'))
     const control = store.createFactory({ name: 'Control', role: 'Control', evidenceWeight: 1 })
     const explorer = store.createFactory({ name: 'Alpha', role: 'Explorer', evidenceWeight: 2 })
     const cSession = store.createSession({

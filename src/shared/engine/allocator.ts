@@ -14,17 +14,18 @@ export interface AllocateByEvidenceResult {
   effectiveWeights: Record<string, number>
 }
 
-/**
- * Split global Daily Limit across factories by evidence weights.
- * Killed and queued factories get 0. Control gets at least `controlFloorWeight`.
- * Unscored explorers (weight <= 0) take a fixed exploration allotment from the pot first.
- */
-export function allocateByEvidence(input: AllocateByEvidenceInput): AllocateByEvidenceResult {
+interface EligibleFilterResult {
+  piles: Record<string, number>
+  effectiveWeights: Record<string, number>
+  eligible: Factory[]
+}
+
+function filterEligible(factories: Factory[]): EligibleFilterResult {
   const piles: Record<string, number> = {}
   const effectiveWeights: Record<string, number> = {}
   const eligible: Factory[] = []
 
-  for (const f of input.factories) {
+  for (const f of factories) {
     if (f.role === 'Killed' || f.queuedNextOpen) {
       piles[f.id] = 0
       effectiveWeights[f.id] = 0
@@ -33,6 +34,15 @@ export function allocateByEvidence(input: AllocateByEvidenceInput): AllocateByEv
     eligible.push(f)
   }
 
+  return { piles, effectiveWeights, eligible }
+}
+
+function applyExplorationAllotment(
+  eligible: Factory[],
+  input: AllocateByEvidenceInput,
+  piles: Record<string, number>,
+  effectiveWeights: Record<string, number>
+): { weighted: Factory[]; remaining: number } {
   let remaining = input.dailyLimitUsd
   const weighted: Factory[] = []
 
@@ -47,26 +57,42 @@ export function allocateByEvidence(input: AllocateByEvidenceInput): AllocateByEv
     }
   }
 
+  return { weighted, remaining }
+}
+
+function computeEffectiveWeights(
+  weighted: Factory[],
+  controlFloorWeight: number,
+  effectiveWeights: Record<string, number>
+): number {
   let weightSum = 0
   for (const f of weighted) {
     const w =
       f.role === 'Control'
-        ? Math.max(f.evidenceWeight, input.controlFloorWeight)
+        ? Math.max(f.evidenceWeight, controlFloorWeight)
         : Math.max(0, f.evidenceWeight)
     effectiveWeights[f.id] = w
     weightSum += w
   }
+  return weightSum
+}
 
-  if (weighted.length === 0) {
-    return { piles, effectiveWeights }
-  }
+interface PileAssignment {
+  weighted: Factory[]
+  remaining: number
+  weightSum: number
+  effectiveWeights: Record<string, number>
+  piles: Record<string, number>
+}
 
+function assignPiles(ctx: PileAssignment): void {
+  const { weighted, remaining, weightSum, effectiveWeights, piles } = ctx
   if (weightSum <= 0) {
     const each = remaining / weighted.length
     for (const f of weighted) {
       piles[f.id] = each
     }
-    return { piles, effectiveWeights }
+    return
   }
 
   let assigned = 0
@@ -81,6 +107,32 @@ export function allocateByEvidence(input: AllocateByEvidenceInput): AllocateByEv
       assigned += pile
     }
   }
+}
+
+/**
+ * Split global Daily Limit across factories by evidence weights.
+ * Killed and queued factories get 0. Control gets at least `controlFloorWeight`.
+ * Unscored explorers (weight <= 0) take a fixed exploration allotment from the pot first.
+ */
+export function allocateByEvidence(input: AllocateByEvidenceInput): AllocateByEvidenceResult {
+  const { piles, effectiveWeights, eligible } = filterEligible(input.factories)
+  const { weighted, remaining } = applyExplorationAllotment(
+    eligible,
+    input,
+    piles,
+    effectiveWeights
+  )
+
+  if (weighted.length === 0) {
+    return { piles, effectiveWeights }
+  }
+
+  const weightSum = computeEffectiveWeights(
+    weighted,
+    input.controlFloorWeight,
+    effectiveWeights
+  )
+  assignPiles({ weighted, remaining, weightSum, effectiveWeights, piles })
 
   return { piles, effectiveWeights }
 }

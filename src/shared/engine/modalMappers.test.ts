@@ -8,7 +8,7 @@ import {
   mapResearchModal
 } from './modalMappers'
 
-describe('modalMappers', () => {
+describe('mapKickoffModal', () => {
   it('maps kickoff artifact and shows locked messaging when missing', () => {
     expect(mapKickoffModal(null).status).toBe('locked')
     const mapped = mapKickoffModal({
@@ -20,7 +20,9 @@ describe('modalMappers', () => {
     expect(mapped.status).toBe('ready')
     expect(mapped.hypothesis).toBe('gap fade')
   })
+})
 
+describe('mapResearchModal', () => {
   it('maps research sit-out and weights', () => {
     const sit = mapResearchModal({ sitOut: true, allocations: [] })
     expect(sit.sitOut).toBe(true)
@@ -30,7 +32,9 @@ describe('modalMappers', () => {
     })
     expect(plan.allocations).toHaveLength(1)
   })
+})
 
+describe('mapPurchasesModal', () => {
   it('lists multiple purchase symbols when basket > 1', () => {
     const mapped = mapPurchasesModal({
       fills: [
@@ -55,7 +59,9 @@ describe('modalMappers', () => {
     expect(mapped.lines.map((l) => l.symbol).sort()).toEqual(['GOOGL', 'NVDA'])
     expect(mapped.totals.notional).toBeGreaterThan(0)
   })
+})
 
+describe('mapMonitoringModal and mapOutcomeModal', () => {
   it('maps monitoring marks and outcome dual benchmarks', () => {
     const mon = mapMonitoringModal({
       marks: { AAPL: 190 },
@@ -75,7 +81,9 @@ describe('modalMappers', () => {
     expect(out.netPnl).toBe(15)
     expect(out.vsControl).toBe(5)
   })
+})
 
+describe('mapLessonsModal', () => {
   it('maps lessons thought process without crashing on missing', () => {
     expect(mapLessonsModal(null).status).toBe('locked')
     const mapped = mapLessonsModal({

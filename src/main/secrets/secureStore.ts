@@ -21,6 +21,40 @@ interface SecretsFile {
   marketDataKey?: string
 }
 
+function ensureSecretsDir(filePath: string): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+}
+
+function readSecretsFile(filePath: string): SecretsFile {
+  if (!existsSync(filePath)) {
+    return {}
+  }
+  const raw = JSON.parse(readFileSync(filePath, 'utf8')) as SecretsFile
+  return raw
+}
+
+function writeSecretsFile(filePath: string, data: SecretsFile): void {
+  ensureSecretsDir(filePath)
+  writeFileSync(filePath, JSON.stringify(data), { mode: 0o600 })
+}
+
+function decodeSecret(crypto: CryptoPort, encoded: string | undefined): string | undefined {
+  if (!encoded) {
+    return undefined
+  }
+  if (!crypto.isEncryptionAvailable()) {
+    throw new Error('OS encryption unavailable for secrets')
+  }
+  return crypto.decryptString(Buffer.from(encoded, 'base64'))
+}
+
+function encodeSecret(crypto: CryptoPort, plain: string): string {
+  if (!crypto.isEncryptionAvailable()) {
+    throw new Error('OS encryption unavailable for secrets')
+  }
+  return crypto.encryptString(plain).toString('base64')
+}
+
 /**
  * Encrypted local secrets file under the app userData directory.
  * Uses Electron safeStorage when available; never writes plaintext secrets.
@@ -29,39 +63,8 @@ export function createSecureSecretsStore(opts: {
   filePath: string
   crypto: CryptoPort
 }): SecureSecretsStore {
-  const ensureDir = (): void => {
-    mkdirSync(dirname(opts.filePath), { recursive: true })
-  }
-
-  const read = (): SecretsFile => {
-    if (!existsSync(opts.filePath)) {
-      return {}
-    }
-    const raw = JSON.parse(readFileSync(opts.filePath, 'utf8')) as SecretsFile
-    return raw
-  }
-
-  const write = (data: SecretsFile): void => {
-    ensureDir()
-    writeFileSync(opts.filePath, JSON.stringify(data), { mode: 0o600 })
-  }
-
-  const decode = (encoded: string | undefined): string | undefined => {
-    if (!encoded) {
-      return undefined
-    }
-    if (!opts.crypto.isEncryptionAvailable()) {
-      throw new Error('OS encryption unavailable for secrets')
-    }
-    return opts.crypto.decryptString(Buffer.from(encoded, 'base64'))
-  }
-
-  const encode = (plain: string): string => {
-    if (!opts.crypto.isEncryptionAvailable()) {
-      throw new Error('OS encryption unavailable for secrets')
-    }
-    return opts.crypto.encryptString(plain).toString('base64')
-  }
+  const read = (): SecretsFile => readSecretsFile(opts.filePath)
+  const write = (data: SecretsFile): void => writeSecretsFile(opts.filePath, data)
 
   return {
     has(key) {
@@ -69,11 +72,11 @@ export function createSecureSecretsStore(opts: {
       return Boolean(data[key])
     },
     get(key) {
-      return decode(read()[key])
+      return decodeSecret(opts.crypto, read()[key])
     },
     set(key, value) {
       const data = read()
-      data[key] = encode(value)
+      data[key] = encodeSecret(opts.crypto, value)
       write(data)
     },
     clear(key) {

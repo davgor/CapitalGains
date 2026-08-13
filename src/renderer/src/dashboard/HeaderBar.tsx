@@ -32,7 +32,7 @@ export function HeaderBar(props: {
         <button type="button" className="btn-gear" onClick={props.onOpenSettings} aria-label="Settings">
           ⚙
         </button>
-        <AppVersionLabel version={props.version} />
+        <AppVersionLabel version={props.version ?? 'unknown'} />
       </div>
     </header>
   )

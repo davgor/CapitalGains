@@ -19,7 +19,7 @@ function stats(partial: Partial<FactorySessionStats> & Pick<FactorySessionStats,
   }
 }
 
-describe('evaluatePromoteKill', () => {
+describe('evaluatePromoteKill promote', () => {
   it('recommends promote when thresholds met', () => {
     const result = evaluatePromoteKill({
       factories: [stats({ factoryId: 'e1' })],
@@ -27,7 +27,9 @@ describe('evaluatePromoteKill', () => {
     })
     expect(result.find((r) => r.factoryId === 'e1')?.action).toBe('promote')
   })
+})
 
+describe('evaluatePromoteKill session counts', () => {
   it('excludes infra_skip days from session counts', () => {
     const result = evaluatePromoteKill({
       factories: [
@@ -43,7 +45,9 @@ describe('evaluatePromoteKill', () => {
     expect(result.find((r) => r.factoryId === 'e2')?.action).toBe('hold')
     expect(result.find((r) => r.factoryId === 'e2')?.reason).toMatch(/sessions/i)
   })
+})
 
+describe('evaluatePromoteKill kill', () => {
   it('recommends kill on excessive drawdown', () => {
     const result = evaluatePromoteKill({
       factories: [
@@ -58,7 +62,9 @@ describe('evaluatePromoteKill', () => {
     })
     expect(result.find((r) => r.factoryId === 'e3')?.action).toBe('kill')
   })
+})
 
+describe('evaluatePromoteKill control protection', () => {
   it('never auto-kills or promotes Control', () => {
     const result = evaluatePromoteKill({
       factories: [
@@ -74,7 +80,9 @@ describe('evaluatePromoteKill', () => {
     })
     expect(result.find((r) => r.factoryId === 'c')?.action).toBe('hold')
   })
+})
 
+describe('evaluatePromoteKill killed factories', () => {
   it('skips already killed factories', () => {
     const result = evaluatePromoteKill({
       factories: [stats({ factoryId: 'k', role: 'Killed' })],

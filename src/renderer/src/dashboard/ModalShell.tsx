@@ -1,15 +1,15 @@
-import type { StageModalPayload } from '../../../shared/engine/dashboardApi'
-import { renderStageBody } from './StageDetailBodies'
+import type { ReactNode } from 'react'
 
-export function StageDetailModal(props: {
+export function ModalShell(props: {
   title: string
-  payload: StageModalPayload
   onClose: () => void
+  children: ReactNode
+  footer: ReactNode
 }): JSX.Element {
   return (
     <div className="modal-backdrop" role="presentation" onClick={props.onClose}>
       <div
-        className="modal-panel wide"
+        className="modal-panel"
         role="dialog"
         aria-label={props.title}
         onClick={(e) => e.stopPropagation()}
@@ -20,7 +20,8 @@ export function StageDetailModal(props: {
             close
           </button>
         </header>
-        <div className="modal-body mono">{renderStageBody(props.payload)}</div>
+        {props.children}
+        <footer className="modal-foot">{props.footer}</footer>
       </div>
     </div>
   )
