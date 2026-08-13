@@ -80,7 +80,10 @@ describe('purchase detail ready body', () => {
     const table = body.props.children[0]
     const dataRow = table.props.children[1].props.children[0]
 
-    expect(dataRow.props.children.map((cell) => cell.props.children)).toEqual([
+    const values = dataRow.props.children.map(
+      (cell: { props: { children: unknown } }) => cell.props.children
+    )
+    expect(values).toEqual([
       'AAPL',
       3,
       '100.10',

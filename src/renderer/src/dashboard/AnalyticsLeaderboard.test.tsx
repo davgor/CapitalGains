@@ -33,7 +33,12 @@ describe('AnalyticsLeaderboard', () => {
     expect(node.props['aria-label']).toBe('Analytics leaderboard')
     const table = node.props.children[1]
     const body = table.props.children[1]
-    const rows = body.props.children as Array<{ props: { 'data-control'?: string } }>
+    const rows = body.props.children as Array<{
+      props: {
+        'data-control'?: string
+        children: Array<{ props: { children: unknown } }>
+      }
+    }>
     expect(rows.some((r) => r.props['data-control'] === '1')).toBe(true)
     expect(rows.map((r) => r.props['data-control'])).toEqual(['0', '1'])
     expect(rows[0]?.props.children[4].props.children).toBe('80%')

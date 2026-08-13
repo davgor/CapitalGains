@@ -1,7 +1,7 @@
 # Baseline ignore for ts-prune (one pattern per line)
 # Generated from tsconfig.node.json + tsconfig.web.json
 # Refresh after export moves/deletes: npm run deadcode:refresh
-# Refreshed 2026-08-12 (59 entries)
+# Refreshed 2026-08-13 (63 entries)
 
 electron.vite.config.ts:37 - default
 src/main/agent/createAgentPort.ts:11 - MockAgentPortOptions
@@ -20,12 +20,16 @@ src/main/agent/research/schema.ts:10 - researchPlanSchema
 src/main/agent/research/schema.ts:3 - researchAllocationSchema
 src/main/agent/usage.ts:15 - UsageStore
 src/main/agent/usage.ts:3 - UsageRow
-src/main/engine/orchestrator/agentSessionRunner.ts:15 - AgentOrchestratorDeps
-src/main/engine/orchestrator/agentSessionRunner.ts:17 - FactoryDayResult
-src/main/engine/orchestrator/agentSessionRunner.ts:59 - runAgenticSession
+src/main/engine/orchestrator/agentSessionRunner.ts:18 - AgentOrchestratorDeps
+src/main/engine/orchestrator/agentSessionRunner.ts:20 - FactoryDayResult
+src/main/engine/orchestrator/agentSessionRunner.ts:75 - runAgenticSession
 src/main/engine/orchestrator/sessionRunner.ts:26 - OrchestratorDeps
-src/preload/index.ts:24 - AutoUpdateApi
-src/preload/index.ts:25 - AppInfoApi
+src/main/secrets/secureStore.ts:4 - SecretKey
+src/preload/index.ts:43 - AutoUpdateApi
+src/preload/index.ts:44 - AppInfoApi
+src/preload/index.ts:45 - AppSettingsPublic
+src/preload/index.ts:45 - DashboardApi
+src/renderer/src/dashboard/StageDetailBodies.tsx:10 - renderLockedBody
 src/shared/agent/errors.ts:1 - AgentFailureKind
 src/shared/agent/errors.ts:10 - AgentError
 src/shared/agent/errors.ts:28 - isOperationalFailure
@@ -37,6 +41,10 @@ src/shared/agent/types.ts:3 - AgentStage
 src/shared/agent/types.ts:5 - AgentUsageSnapshot
 src/shared/autoUpdate/types.ts:1 - AutoUpdatePhase
 src/shared/autoUpdate/types.ts:17 - AUTO_UPDATE_EVENT_CHANNEL
+src/shared/engine/allocator.ts:12 - AllocateByEvidenceResult
+src/shared/engine/allocator.ts:3 - AllocateByEvidenceInput
+src/shared/engine/dashboardApi.ts:56 - DashboardApi
+src/shared/engine/modalMappers.ts:1 - ModalStatus
 src/shared/engine/ports.ts:13 - AgentPort
 src/shared/engine/ports.ts:18 - MarketDataPort
 src/shared/engine/ports.ts:23 - PlaceOrderRequest
@@ -44,21 +52,17 @@ src/shared/engine/ports.ts:30 - Position
 src/shared/engine/ports.ts:41 - BrokerPort
 src/shared/engine/ports.ts:48 - isQuoteStale
 src/shared/engine/ports.ts:5 - Clock
-src/shared/engine/types.ts:103 - RiskLimits
-src/shared/engine/types.ts:110 - Allocation
-src/shared/engine/types.ts:117 - ResearchPlan
-src/shared/engine/types.ts:123 - FeatureRow
-src/shared/engine/types.ts:144 - FrictionConfig
-src/shared/engine/types.ts:15 - Factory
-src/shared/engine/types.ts:150 - DEFAULT_RISK_LIMITS
-src/shared/engine/types.ts:157 - DEFAULT_FRICTION
-src/shared/engine/types.ts:23 - Session
-src/shared/engine/types.ts:3 - FactoryRole
-src/shared/engine/types.ts:35 - StageRecord
-src/shared/engine/types.ts:43 - Fill
-src/shared/engine/types.ts:5 - StageName
-src/shared/engine/types.ts:56 - Snapshot
-src/shared/engine/types.ts:64 - Outcome
-src/shared/engine/types.ts:76 - EngineConfig
-src/shared/engine/types.ts:82 - LessonRow
-src/shared/engine/types.ts:91 - AgentUsageRow
+src/shared/engine/promote.ts:20 - PromoteAction
+src/shared/engine/stageVisual.ts:13 - UiStageName
+src/shared/engine/stageVisual.ts:15 - StageVisualState
+src/shared/engine/types.ts:100 - Snapshot
+src/shared/engine/types.ts:108 - Outcome
+src/shared/engine/types.ts:120 - EngineConfig
+src/shared/engine/types.ts:126 - LessonRow
+src/shared/engine/types.ts:135 - AgentUsageRow
+src/shared/engine/types.ts:154 - Allocation
+src/shared/engine/types.ts:161 - ResearchPlan
+src/shared/engine/types.ts:167 - FeatureRow
+src/shared/engine/types.ts:67 - Session
+src/shared/engine/types.ts:79 - StageRecord
+src/shared/engine/types.ts:87 - Fill
