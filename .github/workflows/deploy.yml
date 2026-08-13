@@ -122,6 +122,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      # --generate-notes needs .git; gh also resolves the repo from git unless --repo is set
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           pattern: '*-release'
@@ -139,5 +145,6 @@ jobs:
           fi
           printf 'Uploading:\n%s\n' "${assets[@]}"
           gh release create "v${{ needs.prepare.outputs.version }}" "${assets[@]}" \
+            --repo "${{ github.repository }}" \
             --title "CapitalGains v${{ needs.prepare.outputs.version }}" \
             --generate-notes
