@@ -8,13 +8,32 @@ const deployYml = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8
 
 /** Slice the `release:` job block (until EOF — it is the last job). */
 function releaseJobSource(yml) {
+  const normalized = yml.replace(/\r\n/g, '\n')
   const marker = /\n {2}release:\n/
-  const match = marker.exec(yml)
+  const match = marker.exec(normalized)
   if (!match) {
     throw new Error('deploy.yml: could not find top-level release job')
   }
-  return yml.slice(match.index)
+  return normalized.slice(match.index)
 }
+
+describe('releaseJobSource', () => {
+  it('finds the release job when the workflow uses CRLF line endings', () => {
+    const crlf = [
+      'jobs:',
+      '  prepare:',
+      '    runs-on: ubuntu-latest',
+      '  release:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - uses: actions/checkout@v4',
+      ''
+    ].join('\r\n')
+
+    expect(releaseJobSource(crlf)).toContain('  release:\n')
+    expect(releaseJobSource(crlf)).toContain('actions/checkout@v4')
+  })
+})
 
 describe('deploy.yml release job', () => {
   const release = releaseJobSource(deployYml)
