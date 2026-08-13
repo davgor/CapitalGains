@@ -40,7 +40,9 @@ describe('AnalyticsLeaderboard', () => {
     expect(rows[1]?.props.children[4].props.children).toBe('60%')
     expect(node.props.children[3].props.children).toBe('No promote/kill events yet.')
   })
+})
 
+describe('AnalyticsLeaderboard history', () => {
   it('renders null win rates and exact promote history details', () => {
     const node = AnalyticsLeaderboard({
       rows: [

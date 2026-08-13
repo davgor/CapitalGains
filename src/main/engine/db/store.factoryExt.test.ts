@@ -148,7 +148,9 @@ describe('dashboard store aggregate reads', () => {
 
     expect(store.listOutcomesBySessionIds([included.id])).toEqual([outcome])
   })
+})
 
+describe('dashboard store usage reads', () => {
   it('preserves null and numeric agent usage values distinctly', () => {
     const session = createSession()
     store.insertUsage({

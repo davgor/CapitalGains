@@ -71,7 +71,9 @@ describe('appSettings config layer', () => {
       25_000
     )
   })
+})
 
+describe('appSettings remaining config fields', () => {
   it('persists every remaining setting including numeric zero', () => {
     const store = memoryStore()
     const promoteThresholds = {

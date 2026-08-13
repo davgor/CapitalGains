@@ -94,7 +94,9 @@ describe('buildStageModal artifacts', () => {
       allocations: [{ symbol: 'AAPL', weight: 0.6, sector: 'Tech' }]
     })
   })
+})
 
+describe('buildStageModal purchases', () => {
   it('uses only buy fills and computes exact purchase totals', () => {
     const { session } = createSession()
     store.insertFill({

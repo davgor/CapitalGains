@@ -58,7 +58,9 @@ describe('stage detail ready bodies', () => {
       allocations: [{ symbol: 'AAPL', weight: 0.5, sector: 'Tech' }]
     })
   })
+})
 
+describe('purchase detail ready body', () => {
   it('formats purchase values and totals to two decimals', () => {
     const body = renderPurchasesBody({
       status: 'ready',
@@ -92,7 +94,9 @@ describe('stage detail ready bodies', () => {
       '300.60'
     ])
   })
+})
 
+describe('remaining stage detail ready bodies', () => {
   it('serializes monitoring, outcome, and lessons values exactly', () => {
     const monitoring = renderMonitoringBody({
       status: 'ready',

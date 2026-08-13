@@ -40,7 +40,7 @@ describe('addFactory Control selection', () => {
 
   it('creates a second Control-named factory as an Explorer', () => {
     store.createFactory({ name: 'Benchmark', role: 'Control', evidenceWeight: 1 })
-    const created = addFactory(store, () => new Date('2024-06-03T14:00:00.000Z'), 'Control')
+    const created = addFactory(store, () => new Date('2024-06-03T13:20:00.000Z'), 'Control')
 
     expect(created.role).toBe('Explorer')
     expect(created.evidenceWeight).toBe(0)
