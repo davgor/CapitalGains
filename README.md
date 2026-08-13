@@ -78,3 +78,7 @@ Successful merges to `main` (CI Checks green, not `[skip ci]`) trigger **Deploy*
 3. Create a GitHub Release with top-level `release/` files only (including `latest.yml` for updater)
 
 In-app updates use `electron-updater` against GitHub Releases. See [`docs/runbooks/auto-update.md`](docs/runbooks/auto-update.md).
+
+## Settings / secrets
+
+Non-secret config (friction, risk, promote thresholds, Daily Limit) lives in the local SQLite `config` table. Cursor and market-data API keys are OS-encrypted under Electron `userData/secrets/` via `safeStorage` — never in git. See [`docs/runbooks/settings-secrets.md`](docs/runbooks/settings-secrets.md).

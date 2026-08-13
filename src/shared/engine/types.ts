@@ -18,7 +18,51 @@ export interface Factory {
   role: FactoryRole
   evidenceWeight: number
   createdAt: string
+  /** When true, factory waits until next open (late-add). */
+  queuedNextOpen: boolean
+  /** Parent factory id when cloned from a promoted lineage. */
+  lineageParentId: string | null
 }
+
+export interface PromoteEvent {
+  id: string
+  factoryId: string
+  action: 'promote' | 'kill' | 'clone'
+  note: string
+  createdAt: string
+  cloneFactoryId: string | null
+}
+
+export interface AppSettingsPublic {
+  friction: FrictionConfig
+  risk: RiskLimits
+  promoteThresholds: {
+    minSessionsExInfra: number
+    minNetExcessVsSpy: number
+    minNetExcessVsControl: number
+    maxDrawdown: number
+  }
+  controlFloorWeight: number
+  explorationAllotmentUsd: number
+  dailyLimitUsd: number
+  /** Whether Cursor API key is stored (never the raw value). */
+  hasCursorApiKey: boolean
+  /** Whether market-data key is stored. */
+  hasMarketDataKey: boolean
+}
+
+export const DEFAULT_DAILY_LIMIT_USD = 10_000
+export const DEFAULT_CONTROL_FLOOR_WEIGHT = 1
+export const DEFAULT_EXPLORATION_ALLOTMENT_USD = 500
+
+export const CONFIG_KEYS = {
+  dailyLimitUsd: 'ui.dailyLimitUsd',
+  friction: 'ui.friction',
+  risk: 'ui.risk',
+  promoteThresholds: 'ui.promoteThresholds',
+  controlFloorWeight: 'ui.controlFloorWeight',
+  explorationAllotmentUsd: 'ui.explorationAllotmentUsd'
+} as const
 
 export interface Session {
   id: string

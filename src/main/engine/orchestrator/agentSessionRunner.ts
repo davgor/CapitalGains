@@ -1,6 +1,9 @@
-import type {
-  Factory,
-  Session
+import { allocateByEvidence } from '../../../shared/engine/allocator'
+import {
+  DEFAULT_CONTROL_FLOOR_WEIGHT,
+  DEFAULT_EXPLORATION_ALLOTMENT_USD,
+  type Factory,
+  type Session
 } from '../../../shared/engine/types'
 import type { EngineStore } from '../db/store'
 import { mapAgentFailureToSessionFlags } from '../../agent/failures'
@@ -32,18 +35,31 @@ export async function runAgenticDay(opts: {
   factories: Factory[]
   sessionDate: string
   dailyLimitUsd: number
+  controlFloorWeight?: number
+  explorationAllotmentUsd?: number
 }): Promise<FactoryDayResult[]> {
   const results: FactoryDayResult[] = []
   const explorerHypotheses: string[] = []
   let controlNet: number | null = null
   const ordered = orderFactories(opts.factories)
+  const piles = allocateByEvidence({
+    factories: opts.factories,
+    dailyLimitUsd: opts.dailyLimitUsd,
+    controlFloorWeight: opts.controlFloorWeight ?? DEFAULT_CONTROL_FLOOR_WEIGHT,
+    explorationAllotmentUsd:
+      opts.explorationAllotmentUsd ?? DEFAULT_EXPLORATION_ALLOTMENT_USD
+  }).piles
 
   for (const factory of ordered) {
+    const cash = piles[factory.id] ?? 0
+    if (factory.role === 'Killed' || factory.queuedNextOpen || cash <= 0) {
+      continue
+    }
     const result = await runOneFactoryDay({
       deps: opts.deps,
       factory,
       sessionDate: opts.sessionDate,
-      dailyLimitUsd: opts.dailyLimitUsd,
+      dailyLimitUsd: cash,
       siblingHypotheses: explorerHypotheses,
       controlSameDayNet: controlNet
     })
