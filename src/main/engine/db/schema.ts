@@ -6,7 +6,9 @@ const STATEMENTS = [
     name TEXT NOT NULL,
     role TEXT NOT NULL,
     evidence_weight REAL NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    queued_next_open INTEGER NOT NULL DEFAULT 0,
+    lineage_parent_id TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -81,12 +83,22 @@ const STATEMENTS = [
     total_tokens REAL,
     cost_usd REAL,
     created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS promote_events (
+    id TEXT PRIMARY KEY,
+    factory_id TEXT NOT NULL REFERENCES factories(id),
+    action TEXT NOT NULL,
+    note TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    clone_factory_id TEXT
   )`
 ]
 
 /** Additive migrations for databases created before newer columns/tables. */
 const ALTERS = [
-  `ALTER TABLE lessons ADD COLUMN exclude_from_promote INTEGER NOT NULL DEFAULT 0`
+  `ALTER TABLE lessons ADD COLUMN exclude_from_promote INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE factories ADD COLUMN queued_next_open INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE factories ADD COLUMN lineage_parent_id TEXT`
 ]
 
 export function migrate(db: Database.Database): void {

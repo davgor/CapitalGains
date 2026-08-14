@@ -8,6 +8,7 @@ import type {
   Fill,
   LessonRow,
   Outcome,
+  PromoteEvent,
   Session,
   Snapshot,
   StageName,
@@ -18,9 +19,22 @@ import { migrate } from './schema'
 
 export interface EngineStore {
   close(): void
-  createFactory(input: { name: string; role: FactoryRole; evidenceWeight: number }): Factory
+  createFactory(input: {
+    name: string
+    role: FactoryRole
+    evidenceWeight: number
+    queuedNextOpen?: boolean
+    lineageParentId?: string | null
+  }): Factory
   getFactory(id: string): Factory | undefined
   listFactories(): Factory[]
+  renameFactory(id: string, name: string): Factory
+  updateFactory(
+    id: string,
+    patch: Partial<
+      Pick<Factory, 'role' | 'evidenceWeight' | 'queuedNextOpen' | 'lineageParentId' | 'name'>
+    >
+  ): Factory
   createSession(input: {
     factoryId: string
     sessionDate: string
@@ -28,6 +42,7 @@ export interface EngineStore {
   }): Session
   getSession(id: string): Session | undefined
   listSessionsByDate(sessionDate: string): Session[]
+  listSessionsByFactory(factoryId: string): Session[]
   updateSession(id: string, patch: Partial<Pick<Session, 'stage' | 'infraSkip' | 'buysBlocked'>>): Session
   commitStage(input: {
     sessionId: string
@@ -42,6 +57,7 @@ export interface EngineStore {
   listSnapshots(sessionId: string): Snapshot[]
   insertOutcome(input: Omit<Outcome, 'id' | 'createdAt'>): Outcome
   getOutcome(sessionId: string): Outcome | undefined
+  listOutcomesBySessionIds(sessionIds: string[]): Outcome[]
   setConfig(key: string, value: unknown): EngineConfig
   getConfig<T>(key: string): T | undefined
   insertLesson(input: {
@@ -58,6 +74,13 @@ export interface EngineStore {
     usage: AgentUsageSnapshot | null
   }): AgentUsageRow
   listUsageBySessionDate(sessionDate: string): AgentUsageRow[]
+  insertPromoteEvent(input: {
+    factoryId: string
+    action: PromoteEvent['action']
+    note: string
+    cloneFactoryId?: string | null
+  }): PromoteEvent
+  listPromoteEvents(): PromoteEvent[]
 }
 
 export function openEngineStore(dbPath: string): EngineStore {
@@ -74,9 +97,12 @@ function createRepository(db: Database.Database): EngineStore {
     createFactory: (input) => insertFactory(db, input),
     getFactory: (id) => selectFactory(db, id),
     listFactories: () => selectFactories(db),
+    renameFactory: (id, name) => patchFactory(db, id, { name }),
+    updateFactory: (id, patch) => patchFactory(db, id, patch),
     createSession: (input) => insertSession(db, input),
     getSession: (id) => selectSession(db, id),
     listSessionsByDate: (sessionDate) => selectSessionsByDate(db, sessionDate),
+    listSessionsByFactory: (factoryId) => selectSessionsByFactory(db, factoryId),
     updateSession: (id, patch) => patchSession(db, id, patch),
     commitStage: (input) => insertStage(db, input),
     listStageRecords: (sessionId) => selectStages(db, sessionId),
@@ -87,12 +113,15 @@ function createRepository(db: Database.Database): EngineStore {
     listSnapshots: (sessionId) => selectSnaps(db, sessionId),
     insertOutcome: (input) => insertOut(db, input),
     getOutcome: (sessionId) => selectOut(db, sessionId),
+    listOutcomesBySessionIds: (sessionIds) => selectOutcomesBySessionIds(db, sessionIds),
     setConfig: (key, value) => upsertConfig(db, key, value),
     getConfig: (key) => readConfig(db, key),
     insertLesson: (input) => insertLessonRow(db, input),
     listLessonsPool: (opts) => selectLessonsPool(db, opts),
     insertUsage: (input) => insertUsageRow(db, input),
-    listUsageBySessionDate: (sessionDate) => selectUsageByDate(db, sessionDate)
+    listUsageBySessionDate: (sessionDate) => selectUsageByDate(db, sessionDate),
+    insertPromoteEvent: (input) => insertPromote(db, input),
+    listPromoteEvents: () => selectPromoteEvents(db)
   }
 }
 
@@ -100,41 +129,96 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+function mapFactory(raw: Record<string, unknown>): Factory {
+  return {
+    id: String(raw['id']),
+    name: String(raw['name']),
+    role: raw['role'] as FactoryRole,
+    evidenceWeight: Number(raw['evidenceWeight']),
+    createdAt: String(raw['createdAt']),
+    queuedNextOpen: Boolean(raw['queuedNextOpen']),
+    lineageParentId:
+      raw['lineageParentId'] === null || raw['lineageParentId'] === undefined
+        ? null
+        : String(raw['lineageParentId'])
+  }
+}
+
+const FACTORY_SELECT = `SELECT id, name, role, evidence_weight AS evidenceWeight,
+  created_at AS createdAt, queued_next_open AS queuedNextOpen,
+  lineage_parent_id AS lineageParentId FROM factories`
+
 function insertFactory(
   db: Database.Database,
-  input: { name: string; role: FactoryRole; evidenceWeight: number }
+  input: {
+    name: string
+    role: FactoryRole
+    evidenceWeight: number
+    queuedNextOpen?: boolean
+    lineageParentId?: string | null
+  }
 ): Factory {
   const row: Factory = {
     id: randomUUID(),
     name: input.name,
     role: input.role,
     evidenceWeight: input.evidenceWeight,
-    createdAt: nowIso()
+    createdAt: nowIso(),
+    queuedNextOpen: input.queuedNextOpen ?? false,
+    lineageParentId: input.lineageParentId ?? null
   }
   db.prepare(
-    `INSERT INTO factories (id, name, role, evidence_weight, created_at)
-     VALUES (@id, @name, @role, @evidenceWeight, @createdAt)`
-  ).run(row)
+    `INSERT INTO factories (
+      id, name, role, evidence_weight, created_at, queued_next_open, lineage_parent_id
+    ) VALUES (
+      @id, @name, @role, @evidenceWeight, @createdAt, @queuedNextOpen, @lineageParentId
+    )`
+  ).run({
+    ...row,
+    queuedNextOpen: row.queuedNextOpen ? 1 : 0
+  })
   return row
 }
 
 function selectFactory(db: Database.Database, id: string): Factory | undefined {
-  const raw = db
-    .prepare(
-      `SELECT id, name, role, evidence_weight AS evidenceWeight, created_at AS createdAt
-       FROM factories WHERE id = ?`
-    )
-    .get(id) as Factory | undefined
-  return raw
+  const raw = db.prepare(`${FACTORY_SELECT} WHERE id = ?`).get(id) as
+    | Record<string, unknown>
+    | undefined
+  return raw ? mapFactory(raw) : undefined
 }
 
 function selectFactories(db: Database.Database): Factory[] {
-  return db
-    .prepare(
-      `SELECT id, name, role, evidence_weight AS evidenceWeight, created_at AS createdAt
-       FROM factories ORDER BY created_at ASC`
-    )
-    .all() as Factory[]
+  const rows = db
+    .prepare(`${FACTORY_SELECT} ORDER BY created_at ASC`)
+    .all() as Record<string, unknown>[]
+  return rows.map(mapFactory)
+}
+
+function patchFactory(
+  db: Database.Database,
+  id: string,
+  patch: Partial<
+    Pick<Factory, 'role' | 'evidenceWeight' | 'queuedNextOpen' | 'lineageParentId' | 'name'>
+  >
+): Factory {
+  const current = selectFactory(db, id)
+  if (!current) {
+    throw new Error(`factory not found: ${id}`)
+  }
+  const next: Factory = { ...current, ...patch }
+  db.prepare(
+    `UPDATE factories SET name = @name, role = @role, evidence_weight = @evidenceWeight,
+      queued_next_open = @queuedNextOpen, lineage_parent_id = @lineageParentId
+     WHERE id = @id`
+  ).run({
+    id: next.id,
+    name: next.name,
+    role: next.role,
+    evidenceWeight: next.evidenceWeight,
+    queuedNextOpen: next.queuedNextOpen ? 1 : 0,
+    lineageParentId: next.lineageParentId
+  })
+  return next
 }
 
 function insertSession(
@@ -206,6 +290,19 @@ function selectSessionsByDate(db: Database.Database, sessionDate: string): Sessi
        FROM sessions WHERE session_date = ? ORDER BY created_at ASC`
     )
     .all(sessionDate) as Record<string, unknown>[]
+  return rows.map(mapSession)
+}
+
+function selectSessionsByFactory(db: Database.Database, factoryId: string): Session[] {
+  const rows = db
+    .prepare(
+      `SELECT id, factory_id AS factoryId, session_date AS sessionDate, stage,
+              infra_skip AS infraSkip, buys_blocked AS buysBlocked,
+              daily_limit_usd AS dailyLimitUsd, created_at AS createdAt,
+              updated_at AS updatedAt
+       FROM sessions WHERE factory_id = ? ORDER BY session_date ASC, created_at ASC`
+    )
+    .all(factoryId) as Record<string, unknown>[]
   return rows.map(mapSession)
 }
 
@@ -368,6 +465,56 @@ function selectOut(db: Database.Database, sessionId: string): Outcome | undefine
        FROM outcomes WHERE session_id = ?`
     )
     .get(sessionId) as Outcome | undefined
+}
+
+function selectOutcomesBySessionIds(db: Database.Database, sessionIds: string[]): Outcome[] {
+  if (sessionIds.length === 0) {
+    return []
+  }
+  const placeholders = sessionIds.map(() => '?').join(', ')
+  return db
+    .prepare(
+      `SELECT id, session_id AS sessionId, gross_pnl AS grossPnl, net_pnl AS netPnl,
+              full_limit_return AS fullLimitReturn, deployed_return AS deployedReturn,
+              spy_return AS spyReturn, cash_residual AS cashResidual,
+              created_at AS createdAt
+       FROM outcomes WHERE session_id IN (${placeholders})`
+    )
+    .all(...sessionIds) as Outcome[]
+}
+
+function insertPromote(
+  db: Database.Database,
+  input: {
+    factoryId: string
+    action: PromoteEvent['action']
+    note: string
+    cloneFactoryId?: string | null
+  }
+): PromoteEvent {
+  const row: PromoteEvent = {
+    id: randomUUID(),
+    factoryId: input.factoryId,
+    action: input.action,
+    note: input.note,
+    createdAt: nowIso(),
+    cloneFactoryId: input.cloneFactoryId ?? null
+  }
+  db.prepare(
+    `INSERT INTO promote_events (id, factory_id, action, note, created_at, clone_factory_id)
+     VALUES (@id, @factoryId, @action, @note, @createdAt, @cloneFactoryId)`
+  ).run(row)
+  return row
+}
+
+function selectPromoteEvents(db: Database.Database): PromoteEvent[] {
+  return db
+    .prepare(
+      `SELECT id, factory_id AS factoryId, action, note, created_at AS createdAt,
+              clone_factory_id AS cloneFactoryId
+       FROM promote_events ORDER BY created_at DESC`
+    )
+    .all() as PromoteEvent[]
 }
 
 function upsertConfig(db: Database.Database, key: string, value: unknown): EngineConfig {

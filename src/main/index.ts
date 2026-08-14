@@ -1,7 +1,11 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage } from 'electron'
 import { join } from 'node:path'
 import { initAutoUpdate, registerAutoUpdateHandlers } from './autoUpdate'
+import { registerDashboardHandlers } from './dashboard/ipc'
+import { createDashboardService } from './dashboard/service'
+import { openEngineStore } from './engine/db/store'
 import { setupGlobalErrorLogging } from './logger'
+import { createSecureSecretsStore, defaultSecretsPath } from './secrets/secureStore'
 
 setupGlobalErrorLogging()
 
@@ -29,9 +33,29 @@ function registerAppVersionHandler(): void {
   ipcMain.handle('app:getVersion', () => app.getVersion())
 }
 
+function bootDashboard(): void {
+  const dbPath = join(app.getPath('userData'), 'engine.sqlite')
+  const store = openEngineStore(dbPath)
+  const secrets = createSecureSecretsStore({
+    filePath: defaultSecretsPath(app.getPath('userData')),
+    crypto: {
+      isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+      encryptString: (plain) => safeStorage.encryptString(plain),
+      decryptString: (blob) => safeStorage.decryptString(blob)
+    }
+  })
+  const service = createDashboardService({ store, secrets })
+  registerDashboardHandlers(service)
+
+  app.on('will-quit', () => {
+    store.close()
+  })
+}
+
 app.whenReady().then(() => {
   registerAppVersionHandler()
   registerAutoUpdateHandlers()
+  bootDashboard()
   initAutoUpdate()
   createMainWindow()
 
